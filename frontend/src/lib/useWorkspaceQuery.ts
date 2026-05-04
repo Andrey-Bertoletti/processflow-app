@@ -1,5 +1,5 @@
 import { useAuth } from "@/app/context/AuthContext";
-import { supabase } from "@/lib/supabase";
+import type { PostgrestFilterBuilder } from "@supabase/postgrest-js";
 
 /**
  * Hook customizado que garante que TODA query inclua workspace_id
@@ -15,18 +15,22 @@ export function useWorkspaceQuery() {
   return {
     workspaceId: activeWorkspaceId,
     // Helper para adicionar filtro de workspace automaticamente
-    addWorkspaceFilter: (query: any) => {
-      return query.eq("workspace_id", activeWorkspaceId);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    addWorkspaceFilter: <T extends { eq: (col: string, val: any) => any }>(query: T): T => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return query.eq("workspace_id" as any, activeWorkspaceId);
     },
+
   };
 }
 
 /**
  * Helper para garantir que dados criados sempre incluem workspace_id
  */
-export function ensureWorkspaceId(data: any, workspaceId: string) {
+export function ensureWorkspaceId<T extends Record<string, unknown>>(data: T, workspaceId: string): T & { workspace_id: string } {
   return {
     ...data,
     workspace_id: workspaceId,
   };
 }
+

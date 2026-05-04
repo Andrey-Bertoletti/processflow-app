@@ -4,6 +4,9 @@ import { useState } from "react";
 import { supabase } from "../../lib/supabase";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Button from "@/components/ui/Button";
+import Surface from "@/components/ui/Surface";
+import { TextField } from "@/components/ui/Field";
 
 export default function LoginForm() {
   const router = useRouter();
@@ -31,41 +34,60 @@ export default function LoginForm() {
         return;
       }
 
-      router.push("/auth/workspace/create");
+      // Verifica se o usuário já tem workspaces
+      const { data: workspaces } = await supabase
+        .from("workspaces")
+        .select("id")
+        .eq("owner_id", (await supabase.auth.getUser()).data.user?.id)
+        .limit(1);
+
+      if (workspaces && workspaces.length > 0) {
+        router.push("/auth/dashboard");
+      } else {
+        router.push("/auth/workspace/create");
+      }
+
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="bg-gray-800 p-8 rounded-lg shadow-2xl">
-      <h1 className="text-3xl font-bold text-white mb-2">Entrar</h1>
-      <p className="text-gray-400 mb-6">Faça login para continuar</p>
-      <input
-        className="w-full p-3 bg-gray-700 text-white rounded mb-4 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-        placeholder="Email"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        disabled={loading}
-      />
-      <input
-        className="w-full p-3 bg-gray-700 text-white rounded mb-6 focus:outline-none focus:ring-2 focus:ring-green-500 transition"
-        type="password"
-        placeholder="Senha"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        disabled={loading}
-      />
-      <button onClick={handleLogin} disabled={loading} className="w-full bg-green-600 text-white font-bold p-3 rounded hover:bg-green-700 disabled:opacity-50 transition">
-        {loading ? "Entrando..." : "Entrar"}
-      </button>
-      <p className="text-center text-gray-400 mt-6">
+    <Surface className="app-enter p-8">
+      <div className="mb-6">
+        <span className="app-pill mb-3">Acesso Seguro</span>
+        <h1 className="text-3xl font-bold text-white">Entrar</h1>
+        <p className="mt-2 text-sm text-slate-400">Faça login para continuar.</p>
+      </div>
+
+      <div className="space-y-4">
+        <TextField
+          label="Email"
+          type="email"
+          placeholder="voce@empresa.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          disabled={loading}
+        />
+        <TextField
+          label="Senha"
+          type="password"
+          placeholder="Sua senha"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          disabled={loading}
+        />
+        <Button onClick={handleLogin} disabled={loading} className="w-full">
+          {loading ? "Entrando..." : "Entrar"}
+        </Button>
+      </div>
+
+      <p className="mt-6 text-center text-slate-400">
         Não tem conta? {" "}
-        <Link href="/auth/register" className="text-green-400 hover:underline font-semibold">
+        <Link href="/auth/register" className="font-semibold text-blue-300 hover:text-blue-200">
           Registre-se aqui
         </Link>
       </p>
-    </div>
+    </Surface>
   );
 }

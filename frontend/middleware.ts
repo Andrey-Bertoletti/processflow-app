@@ -1,23 +1,23 @@
 import { type NextRequest, NextResponse } from "next/server";
 
 export function middleware(request: NextRequest) {
-  // Rotas públicas
-  const publicRoutes = ["/auth/login", "/auth/register"];
-
   const pathname = request.nextUrl.pathname;
-  const isPublicRoute = publicRoutes.some((route) => pathname.startsWith(route));
+  const publicRoutes = ["/", "/auth/login", "/auth/register"];
+  const privateRoutes = ["/auth/dashboard", "/auth/workspace/create", "/pipeline"];
+  const isPublicRoute = publicRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  const isPrivateRoute = privateRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
-  // Se for rota pública, deixa passar
   if (isPublicRoute) {
     return NextResponse.next();
   }
 
-  // Para rotas protegidas, verifica se tem token
-  // (Supabase armazena token em cookie automaticamente)
-  const authToken = request.cookies.get("sb-auth-token");
+  if (!isPrivateRoute) {
+    return NextResponse.next();
+  }
 
-  if (!authToken && !pathname.startsWith("/")) {
-    // Redireciona para login se não tiver token
+  const hasSupabaseCookie = request.cookies.getAll().some((cookie) => cookie.name.startsWith("sb-"));
+
+  if (!hasSupabaseCookie) {
     return NextResponse.redirect(new URL("/auth/login", request.url));
   }
 

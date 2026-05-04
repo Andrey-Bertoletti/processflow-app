@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test": "vitest run",
+    "test:unit": "vitest run src/lib/pipeline-utils.test.ts src/lib/leads.test.ts",
+    "test:integration": "vitest run src/lib/pipeline.integration.test.ts",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.1",

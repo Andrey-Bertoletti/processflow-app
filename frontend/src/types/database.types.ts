@@ -57,6 +57,7 @@ export type Database = {
       }
       leads: {
         Row: {
+          assigned_to: string | null
           created_at: string | null
           email: string | null
           id: string
@@ -67,6 +68,7 @@ export type Database = {
           workspace_id: string
         }
         Insert: {
+          assigned_to?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
@@ -77,6 +79,7 @@ export type Database = {
           workspace_id: string
         }
         Update: {
+          assigned_to?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
@@ -87,6 +90,13 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_stage_id_fkey"
             columns: ["stage_id"]
@@ -182,6 +192,7 @@ export type Database = {
           id: string
           name: string
           order: number
+          required_fields: { field: string; label: string; type: string; required: boolean }[] | null
           updated_at: string | null
           workspace_id: string
         }
@@ -190,6 +201,7 @@ export type Database = {
           id?: string
           name: string
           order: number
+          required_fields?: { field: string; label: string; type: string; required: boolean }[] | null
           updated_at?: string | null
           workspace_id: string
         }
@@ -198,6 +210,7 @@ export type Database = {
           id?: string
           name?: string
           order?: number
+          required_fields?: string[] | null
           updated_at?: string | null
           workspace_id?: string
         }
@@ -270,6 +283,20 @@ export type Database = {
     }
     Functions: {
       is_user_in_workspace: { Args: { ws_id: string }; Returns: boolean }
+      get_workspace_members: {
+        Args: { p_workspace_id: string }
+        Returns: {
+          id: string
+          user_id: string
+          role: string
+          email: string
+          display_name: string
+        }[]
+      }
+      is_valid_lead_assignee: {
+        Args: { p_workspace_id: string; p_assigned_to: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

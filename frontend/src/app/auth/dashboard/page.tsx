@@ -4,6 +4,8 @@ import { useAuth } from "@/app/context/AuthContext";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Button from "@/components/ui/Button";
+import Surface from "@/components/ui/Surface";
 
 interface Workspace {
   id: string;
@@ -64,93 +66,85 @@ export default function Dashboard() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-gray-900 to-black">
-      <div className="max-w-6xl mx-auto p-8">
-        {/* Header */}
-        <div className="bg-gray-800 rounded-lg shadow-lg p-8 mb-8">
-          <div className="flex justify-between items-center">
+    <main className="app-shell min-h-screen px-4 py-8">
+      <div className="mx-auto max-w-6xl space-y-6">
+        <Surface className="app-enter p-8">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
+              <span className="app-pill mb-3">Workspace Overview</span>
               <h1 className="text-4xl font-bold text-white">Dashboard</h1>
-              <p className="text-gray-400 mt-2">Bem-vindo, {user.email}</p>
+              <p className="mt-2 text-slate-400">Bem-vindo, {user.email}</p>
             </div>
-            <button
-              onClick={handleLogout}
-              className="bg-red-600 text-white px-6 py-3 rounded hover:bg-red-700 transition font-semibold"
-            >
+            <Button variant="danger" onClick={handleLogout}>
               Sair
-            </button>
+            </Button>
           </div>
+        </Surface>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <Surface className="p-6">
+            <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">Seu Email</h3>
+            <p className="mt-3 text-lg text-white">{user.email}</p>
+          </Surface>
+          <Surface className="p-6">
+            <h3 className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">ID do Usuário</h3>
+            <p className="mt-3 break-all font-mono text-sm text-white">{user.id}</p>
+          </Surface>
         </div>
 
-        {/* User Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-          <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-            <h3 className="text-lg font-semibold text-white mb-2">Seu Email</h3>
-            <p className="text-gray-300">{user.email}</p>
-          </div>
-          <div className="bg-gray-800 p-6 rounded-lg shadow-lg">
-            <h3 className="text-lg font-semibold text-white mb-2">ID do Usuário</h3>
-            <p className="text-gray-300 font-mono text-sm break-all">{user.id}</p>
-          </div>
-        </div>
-
-        {/* Workspaces Section */}
-        <div className="bg-gray-800 rounded-lg shadow-lg p-8">
-          <div className="flex justify-between items-center mb-6">
+        <Surface className="p-8">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-2xl font-bold text-white">Meus Workspaces</h2>
-            <button
-              onClick={() => router.push("/auth/workspace/create")}
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition font-semibold"
-            >
-              + Novo Workspace
-            </button>
+            <div className="flex items-center gap-2">
+              {activeWorkspaceId && (
+                <Button variant="secondary" onClick={() => router.push("/pipeline")}>
+                  Abrir Funil
+                </Button>
+              )}
+              <Button onClick={() => router.push("/auth/workspace/create")}>+ Novo Workspace</Button>
+            </div>
           </div>
 
           {loadingWorkspaces ? (
-            <p className="text-gray-400">Carregando workspaces...</p>
+            <p className="text-slate-400">Carregando workspaces...</p>
           ) : workspaces.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400 mb-4">Você ainda não tem workspaces</p>
-              <button
-                onClick={() => router.push("/auth/workspace/create")}
-                className="bg-blue-600 text-white px-6 py-3 rounded hover:bg-blue-700 transition"
-              >
-                Criar seu primeiro workspace
-              </button>
+            <div className="py-12 text-center">
+              <p className="mb-4 text-slate-400">Você ainda não tem workspaces.</p>
+              <Button onClick={() => router.push("/auth/workspace/create")}>Criar seu primeiro workspace</Button>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {workspaces.map((workspace) => (
-                <div
+                <button
                   key={workspace.id}
                   onClick={() => {
                     setActiveWorkspaceId(workspace.id);
                     // Redireciona para workspace (quando existir página de workspace)
                     // router.push(`/workspace/${workspace.id}`);
                   }}
-                  className={`p-6 rounded-lg cursor-pointer transition ${
+                  className={`text-left p-6 transition ${
                     activeWorkspaceId === workspace.id
-                      ? "bg-blue-700 border-2 border-blue-400"
-                      : "bg-gray-700 hover:bg-gray-600 border-2 border-transparent"
+                      ? "app-card-strong ring-1 ring-blue-500/40"
+                      : "app-card hover:border-blue-400/40"
                   }`}
                 >
-                  <h3 className="text-xl font-semibold text-white mb-2">
+                  <h3 className="mb-2 text-xl font-semibold text-white">
                     {workspace.name}
                   </h3>
-                  <p className="text-gray-400 text-sm mb-4">
+                  <p className="mb-4 text-sm text-slate-400">
                     ID: {workspace.id.substring(0, 8)}...
                   </p>
-                  <p className="text-gray-400 text-xs">
+                  <p className="text-xs text-slate-500">
                     Criado em: {new Date(workspace.created_at).toLocaleDateString()}
                   </p>
                   {activeWorkspaceId === workspace.id && (
-                    <p className="text-blue-200 text-xs mt-3 font-semibold">✓ Ativo</p>
+                    <p className="mt-3 text-xs font-semibold text-blue-300">✓ Ativo</p>
                   )}
-                </div>
+                </button>
               ))}
             </div>
           )}
-        </div>
+        </Surface>
       </div>
     </main>
   );

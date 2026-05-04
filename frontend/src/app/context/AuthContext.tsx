@@ -18,14 +18,16 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(null);
+  const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("activeWorkspaceId");
+    }
+    return null;
+  });
   const [workspaceId, setWorkspaceId] = useState<string | null>(null);
 
-  // Carregar activeWorkspaceId do localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("activeWorkspaceId");
-    if (saved) setActiveWorkspaceId(saved);
-  }, []);
+  // Removido useEffect redundante que causava cascading renders
+
 
   // Salvar activeWorkspaceId no localStorage
   const handleSetActiveWorkspace = (id: string | null) => {
