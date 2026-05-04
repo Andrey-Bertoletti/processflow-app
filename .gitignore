@@ -145,3 +145,6 @@ node_modules
 .env
 .next
 dist
+
+AGENTS.md
+CLAUDE.md
