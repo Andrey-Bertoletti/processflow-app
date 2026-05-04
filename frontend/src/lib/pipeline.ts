@@ -1,22 +1,10 @@
-import { supabase } from "@/lib/supabase";
-import type { Tables } from "@/types/database.types";
-
-export type Stage = Tables<"stages">;
-export type Lead = Tables<"leads">;
+import { supabase } from "@/lib/supabase/client";
+import type { Lead, Stage, WorkspaceMember, LeadFormPayload } from "@/types/database.types";
+export type { Lead, Stage, WorkspaceMember, LeadFormPayload };
 
 export type StageWithLeads = Stage & {
   leads: Lead[];
 };
-
-export type LeadFormPayload = {
-  name: string;
-  email: string | null;
-  phone: string | null;
-  stageId: string;
-  assignedTo: string | null;
-};
-
-export type { WorkspaceMember } from "@/lib/workspace";
 
 export async function fetchPipelineData(workspaceId: string): Promise<StageWithLeads[]> {
   const { data: stages, error: stagesError } = await supabase
@@ -30,7 +18,7 @@ export async function fetchPipelineData(workspaceId: string): Promise<StageWithL
     throw new Error(stagesError.message);
   }
 
-  return (stages || []).map((stage) => {
+  return (stages || []).map((stage: any) => {
     const stageWithRelation = stage as Stage & { leads?: Lead[] | null };
     return {
       ...stageWithRelation,
@@ -70,7 +58,7 @@ export const FIELD_LABELS: Record<string, string> = {
  * Retorna a lista de nomes amigáveis dos campos que estão faltando.
  */
 export function validateLeadMovement(lead: Lead, targetStage: Stage): string[] {
-  const rules = targetStage.required_fields || [];
+  const rules = (targetStage.required_fields as any[]) || [];
   if (rules.length === 0) return [];
 
   const missingFields: string[] = [];

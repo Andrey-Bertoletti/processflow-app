@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "../../lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Button from "@/components/ui/Button";
@@ -34,11 +34,14 @@ export default function LoginForm() {
         return;
       }
 
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuário não encontrado após login");
+
       // Verifica se o usuário já tem workspaces
       const { data: workspaces } = await supabase
         .from("workspaces")
         .select("id")
-        .eq("owner_id", (await supabase.auth.getUser()).data.user?.id)
+        .eq("owner_id", user.id)
         .limit(1);
 
       if (workspaces && workspaces.length > 0) {

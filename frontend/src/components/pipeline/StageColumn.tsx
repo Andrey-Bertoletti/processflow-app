@@ -1,4 +1,4 @@
-import type { StageWithLeads } from "@/lib/pipeline";
+import type { Lead, StageWithLeads } from "@/lib/pipeline";
 import LeadCard from "@/components/pipeline/LeadCard";
 import Surface from "@/components/ui/Surface";
 
@@ -33,7 +33,7 @@ export default function StageColumn({
             Nenhum lead neste estagio
           </div>
         ) : (
-          stage.leads.map((lead) => <LeadCard key={lead.id} lead={lead} onClick={onLeadClick} />)
+          stage.leads.map((lead: Lead) => <LeadCard key={lead.id} lead={lead} onClick={onLeadClick} />)
         )}
       </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Lead, LeadFormPayload, Stage, WorkspaceMember } from "@/lib/pipeline";
+import type { Lead, LeadFormPayload, Stage, WorkspaceMember } from "@/types/database.types";
 import { FIELD_LABELS } from "@/lib/pipeline";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
@@ -41,7 +41,7 @@ export default function StageValidationModal({
 
   const validate = () => {
     const errors: string[] = [];
-    targetStage.required_fields?.forEach(rule => {
+    (targetStage.required_fields as any[])?.forEach(rule => {
       if (rule.field === "email" && email && !email.includes("@")) {
         errors.push("Email inválido");
       }
@@ -72,6 +72,7 @@ export default function StageValidationModal({
         phone: normalizedPhone || null,
         stageId: targetStage.id,
         assignedTo: assignedTo || null,
+        campaignId: lead.campaign_id || null,
       });
     } finally {
 
@@ -80,7 +81,7 @@ export default function StageValidationModal({
   };
 
   const hasRule = (fieldName: string) => 
-    targetStage.required_fields?.some(r => r.field === fieldName);
+    (targetStage.required_fields as any[])?.some(r => r.field === fieldName);
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4">

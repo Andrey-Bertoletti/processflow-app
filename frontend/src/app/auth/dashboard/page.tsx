@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/app/context/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
@@ -10,8 +10,8 @@ import Surface from "@/components/ui/Surface";
 interface Workspace {
   id: string;
   name: string;
-  owner_id: string;
-  created_at: string;
+  owner_id: string | null;
+  created_at: string | null;
 }
 
 export default function Dashboard() {
@@ -114,7 +114,7 @@ export default function Dashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {workspaces.map((workspace) => (
+              {workspaces.map((workspace: Workspace) => (
                 <button
                   key={workspace.id}
                   onClick={() => {
@@ -135,7 +135,7 @@ export default function Dashboard() {
                     ID: {workspace.id.substring(0, 8)}...
                   </p>
                   <p className="text-xs text-slate-500">
-                    Criado em: {new Date(workspace.created_at).toLocaleDateString()}
+                    Criado em: {workspace.created_at ? new Date(workspace.created_at).toLocaleDateString() : "-"}
                   </p>
                   {activeWorkspaceId === workspace.id && (
                     <p className="mt-3 text-xs font-semibold text-blue-300">✓ Ativo</p>

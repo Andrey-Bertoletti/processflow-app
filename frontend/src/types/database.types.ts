@@ -12,36 +12,128 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
+      ai_generations: {
+        Row: {
+          campaign_id: string
+          created_at: string | null
+          id: string
+          lead_id: string
+          prompt: string
+          prompt_hash: string | null
+          response: string
+          status: string | null
+          tokens_used: number | null
+          model: string | null
+          latency_ms: number | null
+          user_id: string
+          workspace_id: string
+        }
+        Insert: {
+          campaign_id: string
+          created_at?: string | null
+          id?: string
+          lead_id: string
+          prompt: string
+          prompt_hash?: string | null
+          response: string
+          status?: string | null
+          tokens_used?: number | null
+          model?: string | null
+          latency_ms?: number | null
+          user_id: string
+          workspace_id: string
+        }
+        Update: {
+          campaign_id?: string
+          created_at?: string | null
+          id?: string
+          lead_id?: string
+          prompt?: string
+          prompt_hash?: string | null
+          response?: string
+          status?: string | null
+          tokens_used?: number | null
+          model?: string | null
+          latency_ms?: number | null
+          user_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_generations_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_generations_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaigns: {
         Row: {
+          base_prompt: string
+          context: string
           created_at: string | null
-          end_date: string | null
           id: string
           name: string
-          start_date: string | null
-          status: string | null
           updated_at: string | null
           workspace_id: string
         }
         Insert: {
+          base_prompt: string
+          context: string
           created_at?: string | null
-          end_date?: string | null
           id?: string
           name: string
-          start_date?: string | null
-          status?: string | null
           updated_at?: string | null
           workspace_id: string
         }
         Update: {
+          base_prompt?: string
+          context?: string
           created_at?: string | null
-          end_date?: string | null
           id?: string
           name?: string
-          start_date?: string | null
-          status?: string | null
           updated_at?: string | null
           workspace_id?: string
         }
@@ -55,12 +147,76 @@ export type Database = {
           },
         ]
       }
+      lead_events: {
+        Row: {
+          created_at: string | null
+          event_type: string
+          id: string
+          lead_id: string
+          new_stage_id: string | null
+          old_stage_id: string | null
+          user_id: string | null
+          workspace_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_type: string
+          id?: string
+          lead_id: string
+          new_stage_id?: string | null
+          old_stage_id?: string | null
+          user_id?: string | null
+          workspace_id: string
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          lead_id?: string
+          new_stage_id?: string | null
+          old_stage_id?: string | null
+          user_id?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lead_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_events_new_stage_id_fkey"
+            columns: ["new_stage_id"]
+            isOneToOne: false
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_events_old_stage_id_fkey"
+            columns: ["old_stage_id"]
+            isOneToOne: false
+            referencedRelation: "stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lead_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leads: {
         Row: {
           assigned_to: string | null
+          campaign_id: string | null
           created_at: string | null
           email: string | null
           id: string
+          is_generating_ai: boolean
           name: string
           phone: string | null
           stage_id: string | null
@@ -69,9 +225,11 @@ export type Database = {
         }
         Insert: {
           assigned_to?: string | null
+          campaign_id?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
+          is_generating_ai?: boolean
           name: string
           phone?: string | null
           stage_id?: string | null
@@ -80,9 +238,11 @@ export type Database = {
         }
         Update: {
           assigned_to?: string | null
+          campaign_id?: string | null
           created_at?: string | null
           email?: string | null
           id?: string
+          is_generating_ai?: boolean
           name?: string
           phone?: string | null
           stage_id?: string | null
@@ -90,13 +250,6 @@ export type Database = {
           workspace_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "leads_assigned_to_fkey"
-            columns: ["assigned_to"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "leads_stage_id_fkey"
             columns: ["stage_id"]
@@ -143,13 +296,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "messages_campaign_id_fkey"
-            columns: ["campaign_id"]
-            isOneToOne: false
-            referencedRelation: "campaigns"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "messages_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
@@ -192,7 +338,7 @@ export type Database = {
           id: string
           name: string
           order: number
-          required_fields: { field: string; label: string; type: string; required: boolean }[] | null
+          required_fields: Json
           updated_at: string | null
           workspace_id: string
         }
@@ -201,7 +347,7 @@ export type Database = {
           id?: string
           name: string
           order: number
-          required_fields?: { field: string; label: string; type: string; required: boolean }[] | null
+          required_fields?: Json
           updated_at?: string | null
           workspace_id: string
         }
@@ -210,7 +356,7 @@ export type Database = {
           id?: string
           name?: string
           order?: number
-          required_fields?: string[] | null
+          required_fields?: Json
           updated_at?: string | null
           workspace_id?: string
         }
@@ -282,30 +428,63 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      is_user_in_workspace: { Args: { ws_id: string }; Returns: boolean }
+      can_access_workspace: {
+        Args: { p_workspace_id: string }
+        Returns: boolean
+      }
+      create_workspace_with_owner: { Args: { p_name: string }; Returns: string }
       get_workspace_members: {
         Args: { p_workspace_id: string }
         Returns: {
-          id: string
-          user_id: string
-          role: string
-          email: string
           display_name: string
+          email: string
+          id: string
+          role: string
+          user_id: string
         }[]
       }
+      is_user_in_workspace: { Args: { ws_id: string }; Returns: boolean }
       is_valid_lead_assignee: {
-        Args: { p_workspace_id: string; p_assigned_to: string }
+        Args: { p_assigned_to: string; p_workspace_id: string }
         Returns: boolean
+      }
+      seed_workspace_pipeline: {
+        Args: { p_with_demo_leads?: boolean; p_workspace_id: string }
+        Returns: undefined
       }
     }
     Enums: {
-      [_ in never]: never
+      campaign_status: "draft" | "active" | "finished"
     }
     CompositeTypes: {
       [_ in never]: never
     }
   }
 }
+
+export type Campaign = Database["public"]["Tables"]["campaigns"]["Row"];
+export type LeadEvent = Database["public"]["Tables"]["lead_events"]["Row"];
+export type AiGeneration = Database["public"]["Tables"]["ai_generations"]["Row"];
+export type Lead = Database["public"]["Tables"]["leads"]["Row"];
+export type Stage = Database["public"]["Tables"]["stages"]["Row"];
+
+export type WorkspaceMember = {
+  id: string;
+  userId: string;
+  role: string | null;
+  email: string | null;
+  displayName: string;
+};
+
+export type LeadFormPayload = {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  stageId: string | null;
+  assignedTo: string | null;
+  campaignId: string | null;
+};
+
 
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
 
@@ -425,7 +604,12 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  public: {
+  graphql_public: {
     Enums: {},
+  },
+  public: {
+    Enums: {
+      campaign_status: ["draft", "active", "finished"],
+    },
   },
 } as const

@@ -1,4 +1,4 @@
-import type { LeadFormPayload } from "@/lib/pipeline";
+import type { LeadFormPayload } from "@/types/database.types";
 
 export function normalizePhone(phone: string | null) {
   if (!phone) {

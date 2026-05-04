@@ -1,5 +1,5 @@
-import { supabase } from "@/lib/supabase";
-import type { Lead, LeadFormPayload } from "@/lib/pipeline";
+import { supabase } from "@/lib/supabase/client";
+import type { Lead, LeadFormPayload } from "@/types/database.types";
 import { normalizePhone, validateLeadPayload } from "@/lib/lead-validation";
 
 export { normalizePhone, validateLeadPayload };
@@ -19,6 +19,7 @@ export async function createLeadInWorkspace(params: {
       phone: normalizePhone(payload.phone),
       stage_id: payload.stageId,
       assigned_to: payload.assignedTo,
+      campaign_id: payload.campaignId,
     })
     .select("*")
     .single();
@@ -46,6 +47,7 @@ export async function updateLeadInWorkspace(params: {
       phone: normalizePhone(payload.phone),
       stage_id: payload.stageId,
       assigned_to: payload.assignedTo,
+      campaign_id: payload.campaignId,
     })
     .eq("id", leadId)
     .eq("workspace_id", workspaceId);

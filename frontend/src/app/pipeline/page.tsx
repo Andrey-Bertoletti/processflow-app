@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/app/context/AuthContext";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/lib/supabase/client";
 
 import KanbanBoard from "@/components/pipeline/KanbanBoard";
 import LeadCreateDrawer from "@/components/pipeline/LeadCreateDrawer";
@@ -11,8 +11,9 @@ import LeadDetailsDrawer from "@/components/pipeline/LeadDetailsDrawer";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { createLeadInWorkspace, deleteLeadInWorkspace, updateLeadInWorkspace, validateLeadPayload } from "@/lib/leads";
-import { fetchPipelineData, moveLeadToStagePlaceholder, validateLeadMovement, type Lead, type LeadFormPayload, type Stage, type StageWithLeads } from "@/lib/pipeline";
-import { fetchWorkspaceMembers, type WorkspaceMember } from "@/lib/workspace";
+import { fetchPipelineData, moveLeadToStagePlaceholder, validateLeadMovement, type StageWithLeads } from "@/lib/pipeline";
+import type { Lead, LeadFormPayload, Stage, WorkspaceMember } from "@/types/database.types";
+import { fetchWorkspaceMembers } from "@/lib/workspace";
 import StageValidationModal from "@/components/pipeline/StageValidationModal";
 
 function PipelineSkeleton() {
@@ -60,6 +61,7 @@ export default function PipelinePage() {
         name: stage.name,
         order: stage.order,
         workspace_id: stage.workspace_id,
+        required_fields: stage.required_fields,
         created_at: stage.created_at,
         updated_at: stage.updated_at,
       })),
@@ -71,14 +73,14 @@ export default function PipelinePage() {
       return null;
     }
 
-    return stages.flatMap((stage) => stage.leads).find((lead) => lead.id === selectedLeadId) || null;
+    return stages.flatMap((stage) => stage.leads).find((lead: Lead) => lead.id === selectedLeadId) || null;
   }, [selectedLeadId, stages]);
 
   const updateLeadInState = (updatedLead: Lead) => {
     setStages((currentStages) => {
       const withoutLead = currentStages.map((stage) => ({
         ...stage,
-        leads: stage.leads.filter((lead) => lead.id !== updatedLead.id),
+        leads: stage.leads.filter((lead: Lead) => lead.id !== updatedLead.id),
       }));
 
       return withoutLead.map((stage) =>
@@ -94,9 +96,9 @@ export default function PipelinePage() {
 
   const removeLeadFromState = (leadId: string) => {
     setStages((currentStages) =>
-      currentStages.map((stage) => ({
+      currentStages.map((stage: StageWithLeads) => ({
         ...stage,
-        leads: stage.leads.filter((lead) => lead.id !== leadId),
+        leads: stage.leads.filter((lead: Lead) => lead.id !== leadId),
       }))
     );
   };
@@ -157,8 +159,8 @@ export default function PipelinePage() {
     }
 
     // Busca o lead e a etapa de destino para validação
-    const lead = stages.flatMap(s => s.leads).find(l => l.id === leadId);
-    const targetStage = stages.find(s => s.id === targetStageId);
+    const lead = stages.flatMap((s: StageWithLeads) => s.leads).find((l: Lead) => l.id === leadId);
+    const targetStage = stages.find((s: StageWithLeads) => s.id === targetStageId);
 
     if (lead && targetStage) {
       const missingFields = validateLeadMovement(lead, targetStage);
@@ -171,8 +173,8 @@ export default function PipelinePage() {
     const previousStages = stages;
     let movedLead: Lead | null = null;
 
-    const optimisticStages = stages.map((stage) => {
-      const found = stage.leads.find((lead) => lead.id === leadId);
+    const optimisticStages = stages.map((stage: StageWithLeads) => {
+      const found = stage.leads.find((lead: Lead) => lead.id === leadId);
 
       if (!found) {
         return stage;
@@ -182,7 +184,7 @@ export default function PipelinePage() {
 
       return {
         ...stage,
-        leads: stage.leads.filter((lead) => lead.id !== leadId),
+        leads: stage.leads.filter((lead: Lead) => lead.id !== leadId),
       };
     });
 
@@ -191,7 +193,7 @@ export default function PipelinePage() {
     }
 
     setStages(
-      optimisticStages.map((stage) =>
+      optimisticStages.map((stage: StageWithLeads) =>
         stage.id === targetStageId
           ? {
               ...stage,

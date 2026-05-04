@@ -5,7 +5,7 @@ const insertMock = vi.fn();
 const selectMock = vi.fn();
 const singleMock = vi.fn();
 
-vi.mock("@/lib/supabase", () => ({
+vi.mock("@/lib/supabase/client", () => ({
   supabase: {
     from: () => ({
       insert: insertMock,

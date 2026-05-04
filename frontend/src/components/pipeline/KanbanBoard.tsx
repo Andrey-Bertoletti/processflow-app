@@ -15,7 +15,7 @@ export default function KanbanBoard({
   return (
     <div className="overflow-x-auto pb-4">
       <div className="flex min-w-max gap-4">
-        {stages.map((stage) => (
+        {stages.map((stage: StageWithLeads) => (
           <StageColumn
             key={stage.id}
             stage={stage}

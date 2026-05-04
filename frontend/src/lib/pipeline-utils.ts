@@ -1,9 +1,9 @@
 import type { Lead, Stage } from "@/lib/pipeline";
 
 export function groupLeadsByStage(stages: Stage[], leads: Lead[]) {
-  return stages.map((stage) => ({
+  return stages.map((stage: Stage) => ({
     ...stage,
-    leads: leads.filter((lead) => lead.stage_id === stage.id),
+    leads: leads.filter((lead: Lead) => lead.stage_id === stage.id),
   }));
 }
 

@@ -1,12 +1,5 @@
-import { supabase } from "@/lib/supabase";
-
-export type WorkspaceMember = {
-  id: string;
-  userId: string;
-  role: string | null;
-  email: string | null;
-  displayName: string;
-};
+import { supabase } from "@/lib/supabase/client";
+import type { WorkspaceMember } from "@/types/database.types";
 
 export async function fetchWorkspaceMembers(workspaceId: string): Promise<WorkspaceMember[]> {
   const { data, error } = await supabase.rpc("get_workspace_members", {
@@ -17,8 +10,11 @@ export async function fetchWorkspaceMembers(workspaceId: string): Promise<Worksp
     throw new Error(error.message);
   }
 
-  return (data || []).map((member: WorkspaceMember) => ({
-    ...member,
-    displayName: member.displayName || member.email || member.userId,
+  return (data || []).map((member: any) => ({
+    id: member.id,
+    userId: member.user_id,
+    role: member.role,
+    email: member.email,
+    displayName: member.display_name || member.email || member.user_id,
   }));
 }

@@ -1,7 +1,7 @@
 import type { HTMLAttributes, ReactNode } from "react";
 
 type SurfaceProps = HTMLAttributes<HTMLDivElement> & {
-  children: ReactNode;
+  children?: ReactNode;
   elevated?: boolean;
 };
 

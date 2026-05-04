@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { LeadFormPayload, Stage, WorkspaceMember } from "@/lib/pipeline";
+import type { LeadFormPayload, Stage, WorkspaceMember } from "@/types/database.types";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { SelectField, TextField } from "@/components/ui/Field";
@@ -75,6 +75,7 @@ export default function LeadCreateDrawer({
               phone: normalizedPhone || null,
               stageId,
               assignedTo: assignedTo || null,
+              campaignId: null,
             });
           }}
 
@@ -109,7 +110,7 @@ export default function LeadCreateDrawer({
             onChange={(event) => setStageId(event.target.value)}
             required
           >
-              {stages.map((stage) => (
+              {stages.map((stage: Stage) => (
                 <option key={stage.id} value={stage.id}>
                   {stage.name}
                 </option>
@@ -122,7 +123,7 @@ export default function LeadCreateDrawer({
             onChange={(event) => setAssignedTo(event.target.value)}
           >
               <option value="">Sem responsavel</option>
-              {members.map((member) => (
+              {members.map((member: WorkspaceMember) => (
                 <option key={member.id} value={member.userId}>
                   {member.displayName} {member.role ? `(${member.role})` : ""}
                 </option>
