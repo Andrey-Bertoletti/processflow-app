@@ -144,6 +144,7 @@ export default function PipelinePage() {
       console.error("[PIPELINE_INIT_ERROR]", err);
       const message = err instanceof Error ? err.message : "Erro ao inicializar funil";
       setError(message);
+      alert(`Erro ao inicializar: ${message}`);
     } finally {
       setIsLoading(false);
     }
@@ -209,6 +210,7 @@ export default function PipelinePage() {
       setStages(previousStages);
       const message = err instanceof Error ? err.message : "Erro ao mover lead";
       setError(message);
+      alert(`Não foi possível mover o lead: ${message}`);
     } finally {
       setIsSavingMove(false);
     }
@@ -235,6 +237,7 @@ export default function PipelinePage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao criar lead";
       setError(message);
+      alert(`Erro ao criar lead: ${message}`);
     } finally {
       setIsSavingCreate(false);
     }
@@ -268,6 +271,7 @@ export default function PipelinePage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao atualizar lead";
       setError(message);
+      alert(`Erro ao atualizar lead: ${message}`);
     } finally {
       setIsSavingDetails(false);
     }
@@ -293,6 +297,7 @@ export default function PipelinePage() {
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao excluir lead";
       setError(message);
+      alert(`Erro ao excluir lead: ${message}`);
     } finally {
       setIsDeletingLead(false);
     }
@@ -459,7 +464,9 @@ export default function PipelinePage() {
               console.error("[PIPELINE_VALIDATION_SAVE_ERROR]", err);
               const message = err instanceof Error ? err.message : "Erro ao completar dados";
               setError(message);
+              alert(`Erro ao completar dados: ${message}`);
             }
+
 
           }}
         />
