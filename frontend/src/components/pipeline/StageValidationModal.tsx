@@ -1,17 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Lead, LeadFormPayload, Stage, WorkspaceMember } from "@/types/database.types";
+import type { LeadFormPayload, Stage, WorkspaceMember, WorkspaceCustomField } from "@/types/database.types";
 import { FIELD_LABELS } from "@/lib/pipeline";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { SelectField, TextField } from "@/components/ui/Field";
+import LeadCustomFieldInputs from "@/components/custom-fields/LeadCustomFieldInputs";
+import { buildLeadCustomFieldValuesDraft, getRequiredRuleLabel, normalizeRequiredFieldRules, type LeadWithCustomFieldValues } from "@/lib/custom-fields";
 
 type StageValidationModalProps = {
   isOpen: boolean;
-  lead: Lead;
+  lead: LeadWithCustomFieldValues;
   targetStage: Stage;
   members: WorkspaceMember[];
+  customFields: WorkspaceCustomField[];
   missingFields: string[];
   onClose: () => void;
   onConfirm: (payload: LeadFormPayload) => Promise<void>;
@@ -22,6 +25,7 @@ export default function StageValidationModal({
   lead,
   targetStage,
   members,
+  customFields,
   missingFields,
   onClose,
   onConfirm,
@@ -29,19 +33,29 @@ export default function StageValidationModal({
   const [email, setEmail] = useState(lead.email || "");
   const [phone, setPhone] = useState(lead.phone || "");
   const [assignedTo, setAssignedTo] = useState(lead.assigned_to || "");
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     setEmail(lead.email || "");
     setPhone(lead.phone || "");
     setAssignedTo(lead.assigned_to || "");
-  }, [lead]);
+    setCustomFieldValues(buildLeadCustomFieldValuesDraft(lead, customFields));
+  }, [lead, customFields]);
 
   if (!isOpen) return null;
 
+  const requiredRules = normalizeRequiredFieldRules(targetStage.required_fields);
+  const requiredBaseRules = requiredRules.filter((rule) => Boolean(rule.field));
+  const requiredCustomFieldIds = requiredRules
+    .filter((rule) => Boolean(rule.custom_field_id))
+    .map((rule) => rule.custom_field_id as string);
+
+  const requiredCustomFields = customFields.filter((field) => requiredCustomFieldIds.includes(field.id) && field.is_active);
+
   const validate = () => {
     const errors: string[] = [];
-    (targetStage.required_fields as any[])?.forEach(rule => {
+    requiredBaseRules.forEach((rule) => {
       if (rule.field === "email" && email && !email.includes("@")) {
         errors.push("Email inválido");
       }
@@ -73,6 +87,7 @@ export default function StageValidationModal({
         stageId: targetStage.id,
         assignedTo: assignedTo || null,
         campaignId: lead.campaign_id || null,
+        customFieldValues,
       });
     } finally {
 
@@ -142,6 +157,14 @@ export default function StageValidationModal({
                 </option>
               ))}
             </SelectField>
+          )}
+
+          {requiredCustomFields.length > 0 && (
+            <LeadCustomFieldInputs
+              fields={requiredCustomFields}
+              values={customFieldValues}
+              onChange={(fieldId, value) => setCustomFieldValues((current) => ({ ...current, [fieldId]: value }))}
+            />
           )}
 
           <div className="flex gap-3 pt-2">

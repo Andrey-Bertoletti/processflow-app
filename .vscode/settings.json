@@ -1,6 +1,6 @@
 {
   "sql.dialect": "postgresql",
   "files.associations": {
-    "supabase/migrations/*.sql": "plaintext"
+    "database/migrations/*.sql": "plaintext"
   }
 }

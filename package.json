@@ -1,15 +1,26 @@
 {
+  "name": "processflow-platform",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "front": "cd frontend && npm run dev",
+    "back": "cd backend/supabase && supabase functions serve",
+    "back:deploy": "cd backend/supabase && supabase functions deploy",
+    "db:sync": "node scripts/sync-supabase-migrations.mjs",
+    "banco": "npm run db:sync && cd backend/supabase && supabase db push",
+    "banco:reset": "npm run db:sync && cd backend/supabase && supabase db reset",
+    "supabase:push": "npm run db:sync && cd backend/supabase && supabase db push",
+    "supabase:reset": "npm run db:sync && cd backend/supabase && supabase db reset",
+    "supabase:start": "npm run db:sync && cd backend/supabase && supabase start",
+    "supabase:stop": "cd backend/supabase && supabase stop",
+    "test:scale": "node scripts/load-test/simulate-scale.mjs full-suite",
+    "ops": "echo 'Dashboard em: http://localhost:3000/admin/system-health'"
+  },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.1"
+    "@supabase/supabase-js": "^2.105.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@vitejs/plugin-react": "^6.0.1",
-    "jsdom": "^29.1.1",
-    "playwright": "^1.59.1",
     "vitest": "^4.1.5"
   }
 }

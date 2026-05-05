@@ -1,16 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { LeadFormPayload, Stage, WorkspaceMember } from "@/types/database.types";
+import type { LeadFormPayload, Stage, WorkspaceMember, WorkspaceCustomField } from "@/types/database.types";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { SelectField, TextField } from "@/components/ui/Field";
+import LeadCustomFieldInputs from "@/components/custom-fields/LeadCustomFieldInputs";
+import type { Json } from "@/types/database.types";
+import { buildCustomFieldMetadata } from "@/lib/custom-fields";
 
 type LeadCreateDrawerProps = {
   isOpen: boolean;
   isSaving: boolean;
   stages: Stage[];
   members: WorkspaceMember[];
+  customFields: WorkspaceCustomField[];
   defaultStageId: string | null;
   onClose: () => void;
   onSubmit: (payload: LeadFormPayload) => Promise<void>;
@@ -21,6 +25,7 @@ export default function LeadCreateDrawer({
   isSaving,
   stages,
   members,
+  customFields,
   defaultStageId,
   onClose,
   onSubmit,
@@ -30,6 +35,10 @@ export default function LeadCreateDrawer({
   const [phone, setPhone] = useState("");
   const [stageId, setStageId] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
+  const [company, setCompany] = useState("");
+  const [role, setRole] = useState("");
+  const [source, setSource] = useState("");
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, Json | null>>({});
 
   useEffect(() => {
     if (!isOpen) return;
@@ -38,10 +47,21 @@ export default function LeadCreateDrawer({
     setEmail("");
     setPhone("");
     setAssignedTo("");
+    setCompany("");
+    setRole("");
+    setSource("");
+    setCustomFieldValues(
+      customFields.reduce<Record<string, Json | null>>((accumulator, field) => {
+        if (field.is_active) {
+          accumulator[field.id] = null;
+        }
+        return accumulator;
+      }, {}),
+    );
 
     const initialStageId = defaultStageId || (stages[0]?.id) || "";
     setStageId(prev => prev === initialStageId ? prev : initialStageId);
-  }, [isOpen, stages, defaultStageId]);
+  }, [isOpen, stages, defaultStageId, customFields]);
 
 
   if (!isOpen) {
@@ -73,9 +93,13 @@ export default function LeadCreateDrawer({
               name: name.trim(),
               email: email.trim() || null,
               phone: normalizedPhone || null,
+              company: company.trim() || null,
+              role: role.trim() || null,
+              source: source.trim() || null,
               stageId,
               assignedTo: assignedTo || null,
               campaignId: null,
+              customFieldValues: buildCustomFieldMetadata(customFieldValues),
             });
           }}
 
@@ -102,6 +126,34 @@ export default function LeadCreateDrawer({
             value={phone}
             onChange={(event) => setPhone(event.target.value)}
             placeholder="(11) 99999-0000"
+          />
+
+          <div className="grid grid-cols-2 gap-3">
+            <TextField
+              label="Empresa"
+              value={company}
+              onChange={(event) => setCompany(event.target.value)}
+              placeholder="Nome da empresa"
+            />
+            <TextField
+              label="Cargo"
+              value={role}
+              onChange={(event) => setRole(event.target.value)}
+              placeholder="Ex: CEO"
+            />
+          </div>
+
+          <TextField
+            label="Origem do Lead"
+            value={source}
+            onChange={(event) => setSource(event.target.value)}
+            placeholder="Ex: LinkedIn, Indicação..."
+          />
+
+          <LeadCustomFieldInputs
+            fields={customFields}
+            values={customFieldValues}
+            onChange={(fieldId, value) => setCustomFieldValues((current) => ({ ...current, [fieldId]: value }))}
           />
 
           <SelectField

@@ -41,6 +41,8 @@ export default function PipelinePage() {
   const { user, loading, activeWorkspaceId } = useAuth();
   const [stages, setStages] = useState<StageWithLeads[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [customFields, setCustomFields] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingCreate, setIsSavingCreate] = useState(false);
   const [isSavingDetails, setIsSavingDetails] = useState(false);
@@ -115,13 +117,17 @@ export default function PipelinePage() {
     setError(null);
 
     try {
-      const [pipelineData, memberData] = await Promise.all([
+      const [pipelineData, memberData, campaignData, customFieldsData] = await Promise.all([
         fetchPipelineData(activeWorkspaceId),
         fetchWorkspaceMembers(activeWorkspaceId),
+        supabase.from("campaigns").select("*").eq("workspace_id", activeWorkspaceId),
+        supabase.from("workspace_custom_fields").select("*").eq("workspace_id", activeWorkspaceId),
       ]);
-
+ 
       setStages(pipelineData);
       setMembers(memberData);
+      setCampaigns(campaignData.data || []);
+      setCustomFields(customFieldsData.data || []);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao carregar o funil";
       setError(message);
@@ -135,7 +141,7 @@ export default function PipelinePage() {
     setIsLoading(true);
     setError(null);
     try {
-      const { error: seedError } = await supabase.rpc("seed_workspace_pipeline", {
+      const { error: seedError } = await (supabase.rpc as any)("seed_workspace_pipeline", {
         p_workspace_id: activeWorkspaceId,
         p_with_demo_leads: true,
       });
@@ -160,12 +166,12 @@ export default function PipelinePage() {
       return;
     }
 
-    // Busca o lead e a etapa de destino para validação
+    // Busca o lead e a etapa de destino para validaÃ§Ã£o
     const lead = stages.flatMap((s: StageWithLeads) => s.leads).find((l: Lead) => l.id === leadId);
     const targetStage = stages.find((s: StageWithLeads) => s.id === targetStageId);
 
     if (lead && targetStage) {
-      const missingFields = validateLeadMovement(lead, targetStage);
+      const missingFields = validateLeadMovement(lead, targetStage, customFields);
       if (missingFields.length > 0) {
         setPendingMove({ lead, targetStage, missingFields });
         return; // Bloqueia o movimento e abre o modal
@@ -214,7 +220,7 @@ export default function PipelinePage() {
       setStages(previousStages);
       const message = err instanceof Error ? err.message : "Erro ao mover lead";
       setError(message);
-      toast.error(`Não foi possível mover: ${message}`);
+      toast.error(`NÃ£o foi possÃ­vel mover: ${message}`);
     } finally {
       setIsSavingMove(false);
     }
@@ -310,7 +316,7 @@ export default function PipelinePage() {
       await deleteLeadInWorkspace({ workspaceId: activeWorkspaceId, leadId: selectedLead.id });
       removeLeadFromState(selectedLead.id);
       setSelectedLeadId(null);
-      toast.success(`Lead excluído.`);
+      toast.success(`Lead excluÃ­do.`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao excluir lead";
       setError(message);
@@ -394,7 +400,12 @@ export default function PipelinePage() {
               <LayoutDashboard className="h-4 w-4" />
               Dashboard
             </Link>
+            <Link href="/admin/settings/fields" className="app-button app-button-secondary text-sm" title="Campos Customizados">
+              <Settings className="h-4 w-4" />
+              Campos
+            </Link>
             {isSavingMove && (
+
               <span className="app-pill border-amber-500/30 bg-amber-500/10 text-amber-200">
                 <Zap className="h-3 w-3" /> Movendo...
               </span>
@@ -404,7 +415,7 @@ export default function PipelinePage() {
 
         {error ? (
           <Surface className="mb-4 flex items-center gap-2 border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
-            <span className="text-red-400">⚠</span> {error}
+            <span className="text-red-400">âš </span> {error}
             <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300 text-lg leading-none">&times;</button>
           </Surface>
         ) : null}
@@ -419,7 +430,7 @@ export default function PipelinePage() {
             </div>
             <h2 className="text-xl font-bold text-white">Funil Vazio</h2>
             <p className="mt-2 text-slate-400">
-              Este workspace ainda não possui estágios configurados.
+              Este workspace ainda nÃ£o possui estÃ¡gios configurados.
             </p>
             <Button 
               variant="primary" 
@@ -427,7 +438,7 @@ export default function PipelinePage() {
               onClick={handleInitializePipeline}
               disabled={isLoading}
             >
-              {isLoading ? "Inicializando..." : "Inicializar Etapas Padrão"}
+              {isLoading ? "Inicializando..." : "Inicializar Etapas PadrÃ£o"}
             </Button>
           </Surface>
         ) : (
@@ -445,6 +456,7 @@ export default function PipelinePage() {
         isSaving={isSavingCreate}
         stages={stageList}
         members={members}
+        customFields={customFields}
         defaultStageId={stageList[0]?.id || null}
         onClose={() => setIsCreateDrawerOpen(false)}
         onSubmit={handleCreateLead}
@@ -457,11 +469,16 @@ export default function PipelinePage() {
         isSaving={isSavingDetails || isDeletingLead}
         stages={stageList}
         members={members}
+        campaigns={campaigns}
+        customFields={customFields}
         onClose={() => setSelectedLeadId(null)}
         onSave={handleUpdateLead}
         onDelete={handleDeleteLead}
+        onMoveToStage={(stageId) => moveLeadOptimistically(selectedLead!.id, stageId)}
         isDeleting={isDeletingLead}
       />
+
+
 
       {pendingMove && (
         <StageValidationModal
@@ -469,6 +486,7 @@ export default function PipelinePage() {
           lead={pendingMove.lead}
           targetStage={pendingMove.targetStage}
           members={members}
+          customFields={customFields}
           missingFields={pendingMove.missingFields}
           onClose={() => setPendingMove(null)}
           onConfirm={async (payload) => {

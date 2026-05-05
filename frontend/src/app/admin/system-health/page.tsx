@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -264,11 +264,10 @@ export default function SystemHealthPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const supabase = createClient();
 
   const fetchHealth = useCallback(async () => {
     try {
-      const { data, error } = await supabase.rpc("get_system_health_snapshot");
+      const { data, error } = await (supabase.rpc as any)("get_system_health_snapshot");
       if (error) throw error;
       setHealth(data as SystemHealth);
       setLastRefreshed(new Date());

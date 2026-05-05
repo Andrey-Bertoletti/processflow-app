@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase/client";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { User, MessageSquare, Bot, MoveRight, FileText } from "lucide-react";
+import { toast } from "sonner";
 
 type Activity = {
   id: string;
@@ -93,17 +94,15 @@ export function LeadTimeline({ leadId }: LeadTimelineProps) {
   const handleGenerateAnalysis = async () => {
     setIsAnalyzing(true);
     try {
-      const res = await fetch('/api/semantic-analysis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ leadId })
+      const { data, error } = await supabase.functions.invoke("semantic-analysis", {
+        body: { lead_id: leadId },
       });
-      if (res.ok) {
-        const { analysis } = await res.json();
-        setSemanticAnalysis(analysis);
-      }
+
+      if (error) throw error;
+      if (data?.analysis) setSemanticAnalysis(data.analysis);
     } catch (err) {
       console.error(err);
+      toast.error("Falha ao gerar análise semântica.");
     } finally {
       setIsAnalyzing(false);
     }
