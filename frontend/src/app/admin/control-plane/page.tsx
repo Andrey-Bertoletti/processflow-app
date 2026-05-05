@@ -59,15 +59,9 @@ export default function ControlPlanePage() {
     if (!confirm("Isso irá truncar e reconstruir todas as Views do CQRS a partir do Log de Eventos. Tem certeza?")) return;
     setIsRebuilding(true);
     try {
-      // Chamada para a Edge Function de Rebuild
-      const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/projection-worker/rebuild`, {
+      // Server-side proxy: não expõe o WEBHOOK_SECRET no bundle do browser
+      const res = await fetch(`/api/admin/rebuild-projections`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.access_token}`,
-          'x-webhook-secret': process.env.NEXT_PUBLIC_WEBHOOK_SECRET || '' // Idealmente proxy pelo next api para não expor a secret, mas para admin interno ok por hora
-        }
       });
       if (!res.ok) throw new Error("Falha ao invocar rebuild");
       alert("Rebuild assíncrono iniciado com sucesso!");

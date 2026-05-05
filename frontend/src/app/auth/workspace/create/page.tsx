@@ -31,7 +31,7 @@ export default function CreateWorkspace() {
       }
 
       // 1. Criar workspace + membership via RPC segura
-      const { data: workspaceId, error: createError } = await supabase.rpc(
+      const { data: workspaceId, error: createError } = await (supabase.rpc as any)(
         "create_workspace_with_owner",
         { p_name: name.trim() }
       );
@@ -48,7 +48,7 @@ export default function CreateWorkspace() {
       }
 
       // 2. Seed do pipeline (estagios padrao + leads demo)
-      const { error: seedError } = await supabase.rpc("seed_workspace_pipeline", {
+      const { error: seedError } = await (supabase.rpc as any)("seed_workspace_pipeline", {
         p_workspace_id: workspaceId,
         p_with_demo_leads: true,
       });
