@@ -62,6 +62,7 @@ export default function PipelinePage() {
         order: stage.order,
         workspace_id: stage.workspace_id,
         required_fields: stage.required_fields,
+        auto_campaign_id: stage.auto_campaign_id,
         created_at: stage.created_at,
         updated_at: stage.updated_at,
       })),

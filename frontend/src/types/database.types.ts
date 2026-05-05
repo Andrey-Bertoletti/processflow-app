@@ -272,6 +272,7 @@ export type Database = {
           content: string
           created_at: string | null
           id: string
+          is_automated: boolean
           lead_id: string | null
           updated_at: string | null
           workspace_id: string
@@ -281,6 +282,7 @@ export type Database = {
           content: string
           created_at?: string | null
           id?: string
+          is_automated?: boolean
           lead_id?: string | null
           updated_at?: string | null
           workspace_id: string
@@ -290,6 +292,7 @@ export type Database = {
           content?: string
           created_at?: string | null
           id?: string
+          is_automated?: boolean
           lead_id?: string | null
           updated_at?: string | null
           workspace_id?: string
@@ -339,6 +342,7 @@ export type Database = {
           name: string
           order: number
           required_fields: Json
+          auto_campaign_id: string | null
           updated_at: string | null
           workspace_id: string
         }
@@ -348,6 +352,7 @@ export type Database = {
           name: string
           order: number
           required_fields?: Json
+          auto_campaign_id?: string | null
           updated_at?: string | null
           workspace_id: string
         }
@@ -357,10 +362,18 @@ export type Database = {
           name?: string
           order?: number
           required_fields?: Json
+          auto_campaign_id?: string | null
           updated_at?: string | null
           workspace_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "stages_auto_campaign_id_fkey"
+            columns: ["auto_campaign_id"]
+            isOneToOne: false
+            referencedRelation: "campaigns"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "stages_workspace_id_fkey"
             columns: ["workspace_id"]

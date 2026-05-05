@@ -7,6 +7,15 @@ import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { SelectField, TextField } from "@/components/ui/Field";
 
+type Message = {
+  id: string;
+  content: string;
+  created_at: string | null;
+  is_automated: boolean;
+  campaign_id: string | null;
+  status?: string;
+};
+
 type LeadDetailsDrawerProps = {
   lead: Lead | null;
   isOpen: boolean;
@@ -43,6 +52,8 @@ export default function LeadDetailsDrawer({
   const [generating, setGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<"idle" | "cached" | "generated" | "error">("idle");
   const [generationError, setGenerationError] = useState<string | null>(null);
+  
+  const [messages, setMessages] = useState<Message[]>([]);
 
   // --- Efeito para Sincronizar Dados quando o Lead selecionado muda ---
   useEffect(() => {
@@ -71,8 +82,32 @@ export default function LeadDetailsDrawer({
       }
     };
 
+    const fetchMessages = async () => {
+      const { data } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('lead_id', lead.id)
+        .order('created_at', { ascending: false });
+      if (data) setMessages(data);
+    };
+
     fetchCampaigns();
-  }, [lead?.id]); // Dependência no ID garante que não resetamos se o objeto lead mudar por revalidação
+    fetchMessages();
+
+    const subscription = supabase
+      .channel(`messages_for_${lead.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `lead_id=eq.${lead.id}` }, payload => {
+        setMessages(prev => [payload.new as Message, ...prev]);
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter: `lead_id=eq.${lead.id}` }, payload => {
+        setMessages(prev => prev.map(msg => msg.id === payload.new.id ? payload.new as Message : msg));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, [lead?.id]);
 
   // --- Handlers ---
   const handleSubmit = async (event: React.FormEvent) => {
@@ -217,10 +252,42 @@ export default function LeadDetailsDrawer({
         </form>
 
         <section className="mt-8 rounded-lg border border-dashed border-slate-700 p-4">
-          <h3 className="text-sm font-semibold text-white">Histórico</h3>
-          <p className="mt-2 text-xs text-slate-400 italic">
-            Sem mensagens ainda. Este painel será conectado com a tabela messages na próxima fase.
-          </p>
+          <h3 className="text-sm font-semibold text-white mb-4">Histórico de Mensagens</h3>
+          {messages.length === 0 ? (
+            <p className="text-xs text-slate-400 italic text-center py-4">
+              Sem mensagens ainda. Arraste este lead para uma etapa automatizada ou gere manualmente.
+            </p>
+          ) : (
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+              {messages.map((msg) => (
+                <div key={msg.id} className="p-3 bg-slate-900 rounded border border-slate-700 animate-in fade-in slide-in-from-top-2">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs text-slate-500">
+                      {msg.created_at ? new Date(msg.created_at).toLocaleString() : ""}
+                    </span>
+                    {msg.is_automated && (
+                      <div className="flex gap-1">
+                        {msg.status === "pending" && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300 border border-amber-800">
+                            ⏳ Gerando...
+                          </span>
+                        )}
+                        {msg.status === "error" && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-900/50 text-red-300 border border-red-800">
+                            ❌ Falhou
+                          </span>
+                        )}
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/50 text-indigo-300 border border-indigo-800">
+                          ⚡ Automação
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <p className={`text-sm whitespace-pre-wrap ${msg.status === 'pending' ? 'text-slate-400 italic' : msg.status === 'error' ? 'text-red-400' : 'text-slate-300'}`}>{msg.content}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </section>
 
         <div className="mt-6 p-4 bg-slate-800/50 rounded-lg border border-slate-700/50">
