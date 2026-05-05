@@ -176,6 +176,17 @@ a {
   color: white;
 }
 
+.app-button-ghost {
+  background: transparent;
+  color: var(--muted);
+  border: none;
+}
+
+.app-button-ghost:hover {
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--foreground);
+}
+
 .app-pill {
   display: inline-flex;
   align-items: center;
@@ -207,4 +218,32 @@ a {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* Scrollbar fina estilizada */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
+}
+
+/* Drag cursor no kanban */
+[draggable="true"] {
+  cursor: grab;
+}
+
+[draggable="true"]:active {
+  cursor: grabbing;
 }

@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/app/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
+import { toast } from "sonner";
+import { Plus, RefreshCw, LayoutDashboard, Zap } from "lucide-react";
 
 import KanbanBoard from "@/components/pipeline/KanbanBoard";
 import LeadCreateDrawer from "@/components/pipeline/LeadCreateDrawer";
@@ -52,7 +54,6 @@ export default function PipelinePage() {
     missingFields: string[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const stageList = useMemo<Stage[]>(
     () =>
@@ -142,12 +143,12 @@ export default function PipelinePage() {
       if (seedError) throw new Error(seedError.message);
       
       await loadPipeline();
-      setSuccessMessage("Funil inicializado com sucesso!");
+      toast.success("Funil inicializado com sucesso!");
     } catch (err) {
       console.error("[PIPELINE_INIT_ERROR]", err);
       const message = err instanceof Error ? err.message : "Erro ao inicializar funil";
       setError(message);
-      alert(`Erro ao inicializar: ${message}`);
+      toast.error(`Falha ao inicializar: ${message}`);
     } finally {
       setIsLoading(false);
     }
@@ -207,13 +208,13 @@ export default function PipelinePage() {
 
     try {
       await moveLeadToStagePlaceholder({ workspaceId: activeWorkspaceId, leadId, targetStageId });
-      setSuccessMessage("Lead movido com sucesso!");
+      toast.success("Lead movido!");
     } catch (err) {
       console.error("[PIPELINE_MOVE_ERROR]", err);
       setStages(previousStages);
       const message = err instanceof Error ? err.message : "Erro ao mover lead";
       setError(message);
-      alert(`Não foi possível mover o lead: ${message}`);
+      toast.error(`Não foi possível mover: ${message}`);
     } finally {
       setIsSavingMove(false);
     }
@@ -237,10 +238,11 @@ export default function PipelinePage() {
       const createdLead = await createLeadInWorkspace({ workspaceId: activeWorkspaceId, payload });
       updateLeadInState(createdLead);
       setIsCreateDrawerOpen(false);
+      toast.success(`Lead "${createdLead.name}" criado com sucesso!`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao criar lead";
       setError(message);
-      alert(`Erro ao criar lead: ${message}`);
+      toast.error(`Falha ao criar: ${message}`);
     } finally {
       setIsSavingCreate(false);
     }
@@ -271,10 +273,11 @@ export default function PipelinePage() {
 
       updateLeadInState(updatedLead);
       setSelectedLeadId(updatedLead.id);
+      toast.success("Lead atualizado!");
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao atualizar lead";
       setError(message);
-      alert(`Erro ao atualizar lead: ${message}`);
+      toast.error(`Falha ao salvar: ${message}`);
     } finally {
       setIsSavingDetails(false);
     }
@@ -285,10 +288,20 @@ export default function PipelinePage() {
       return;
     }
 
-    const confirmed = window.confirm(`Excluir o lead ${selectedLead.name}?`);
-    if (!confirmed) {
-      return;
-    }
+    const confirmed = await new Promise<boolean>((resolve) => {
+      toast(`Excluir "${selectedLead.name}"?`, {
+        action: {
+          label: "Confirmar",
+          onClick: () => resolve(true),
+        },
+        cancel: {
+          label: "Cancelar",
+          onClick: () => resolve(false),
+        },
+        duration: 8000,
+      });
+    });
+    if (!confirmed) return;
 
     setIsDeletingLead(true);
     setError(null);
@@ -297,21 +310,15 @@ export default function PipelinePage() {
       await deleteLeadInWorkspace({ workspaceId: activeWorkspaceId, leadId: selectedLead.id });
       removeLeadFromState(selectedLead.id);
       setSelectedLeadId(null);
+      toast.success(`Lead excluído.`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao excluir lead";
       setError(message);
-      alert(`Erro ao excluir lead: ${message}`);
+      toast.error(`Falha ao excluir: ${message}`);
     } finally {
       setIsDeletingLead(false);
     }
   };
-
-  useEffect(() => {
-    if (successMessage) {
-      const timer = setTimeout(() => setSuccessMessage(null), 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [successMessage]);
 
   useEffect(() => {
     if (!loading && user) {
@@ -363,32 +370,43 @@ export default function PipelinePage() {
       <div className="mx-auto max-w-7xl">
         <Surface className="mb-5 flex flex-wrap items-center justify-between gap-3 p-4">
           <div>
-            <span className="app-pill mb-3">Pipeline</span>
-            <h1 className="text-2xl font-bold text-white">Funil de Leads</h1>
-            <p className="text-sm text-slate-400">Workspace ativo: {activeWorkspaceId}</p>
+            <span className="app-pill mb-2">Pipeline</span>
+            <h1 className="text-xl font-bold text-white">Funil de Leads</h1>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <Button variant="primary" onClick={() => setIsCreateDrawerOpen(true)}>
+            <Button
+              variant="primary"
+              leftIcon={<Plus className="h-4 w-4" />}
+              onClick={() => setIsCreateDrawerOpen(true)}
+            >
               Novo Lead
             </Button>
-            <Button variant="secondary" onClick={loadPipeline} disabled={isSavingMove || isSavingCreate || isSavingDetails || isDeletingLead}>
+            <Button
+              variant="secondary"
+              leftIcon={<RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />}
+              onClick={loadPipeline}
+              disabled={isSavingMove || isSavingCreate || isSavingDetails || isDeletingLead}
+            >
               Recarregar
             </Button>
-            <Link href="/auth/dashboard" className="app-button app-button-secondary">
+            <Link href="/auth/dashboard" className="app-button app-button-secondary text-sm">
+              <LayoutDashboard className="h-4 w-4" />
               Dashboard
             </Link>
-            {isSavingMove && <span className="app-pill border-amber-500/30 bg-amber-500/10 text-amber-200">Movendo...</span>}
+            {isSavingMove && (
+              <span className="app-pill border-amber-500/30 bg-amber-500/10 text-amber-200">
+                <Zap className="h-3 w-3" /> Movendo...
+              </span>
+            )}
           </div>
         </Surface>
 
-        {error ? <Surface className="mb-4 border border-red-500/25 bg-red-500/10 p-4 text-red-200">{error}</Surface> : null}
-        {successMessage ? (
-          <div className="fixed bottom-6 right-6 z-[100] animate-bounce">
-            <Surface className="border-green-500/30 bg-green-500/20 px-6 py-3 text-green-200 shadow-2xl">
-              ✓ {successMessage}
-            </Surface>
-          </div>
+        {error ? (
+          <Surface className="mb-4 flex items-center gap-2 border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
+            <span className="text-red-400">⚠</span> {error}
+            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300 text-lg leading-none">&times;</button>
+          </Surface>
         ) : null}
 
 
@@ -433,6 +451,7 @@ export default function PipelinePage() {
       />
 
       <LeadDetailsDrawer
+        key={selectedLead?.id ?? "lead-none"}
         lead={selectedLead}
         isOpen={Boolean(selectedLead)}
         isSaving={isSavingDetails || isDeletingLead}
@@ -462,12 +481,12 @@ export default function PipelinePage() {
               });
               updateLeadInState(updatedLead);
               setPendingMove(null);
-              setSuccessMessage("Dados atualizados e lead movido!");
+              toast.success("Dados atualizados e lead movido!");
             } catch (err) {
               console.error("[PIPELINE_VALIDATION_SAVE_ERROR]", err);
               const message = err instanceof Error ? err.message : "Erro ao completar dados";
               setError(message);
-              alert(`Erro ao completar dados: ${message}`);
+              toast.error(`Falha ao completar: ${message}`);
             }
 
 

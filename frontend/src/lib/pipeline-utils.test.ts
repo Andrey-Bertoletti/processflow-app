@@ -1,6 +1,5 @@
-import { describe, expect, it } from "vitest";
 import { getDefaultStageId, groupLeadsByStage } from "./pipeline-utils";
-import type { Lead, Stage } from "@/lib/pipeline";
+import type { Lead, Stage } from "@/types/database.types";
 
 describe("pipeline-utils", () => {
   const stages = [

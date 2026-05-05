@@ -1,4 +1,3 @@
-import { describe, expect, it } from "vitest";
 import { validateLeadPayload, normalizePhone } from "./lead-validation";
 
 describe("leads validation", () => {
@@ -10,6 +9,7 @@ describe("leads validation", () => {
         phone: null,
         stageId: "stage-1",
         assignedTo: null,
+        campaignId: null,
       })
     ).toBe("Informe um nome com pelo menos 3 caracteres.");
   });

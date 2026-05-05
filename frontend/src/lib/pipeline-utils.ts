@@ -1,4 +1,4 @@
-import type { Lead, Stage } from "@/lib/pipeline";
+import type { Lead, Stage } from "../types/database.types";
 
 export function groupLeadsByStage(stages: Stage[], leads: Lead[]) {
   return stages.map((stage: Stage) => ({

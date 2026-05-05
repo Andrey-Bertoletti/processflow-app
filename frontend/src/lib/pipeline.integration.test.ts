@@ -1,4 +1,3 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
 import { createLeadInWorkspace } from "./leads";
 
 const insertMock = vi.fn();
@@ -54,6 +53,7 @@ describe("pipeline integration", () => {
         phone: null,
         stageId: "stage-1",
         assignedTo: null,
+        campaignId: null,
       },
     });
 
@@ -65,6 +65,7 @@ describe("pipeline integration", () => {
       phone: null,
       stage_id: "stage-1",
       assigned_to: null,
+      campaign_id: null,
     });
   });
 });

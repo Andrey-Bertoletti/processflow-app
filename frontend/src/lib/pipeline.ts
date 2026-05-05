@@ -18,7 +18,7 @@ export async function fetchPipelineData(workspaceId: string): Promise<StageWithL
     throw new Error(stagesError.message);
   }
 
-  return (stages || []).map((stage: any) => {
+  return (stages || []).map((stage) => {
     const stageWithRelation = stage as Stage & { leads?: Lead[] | null };
     return {
       ...stageWithRelation,
@@ -58,7 +58,12 @@ export const FIELD_LABELS: Record<string, string> = {
  * Retorna a lista de nomes amigáveis dos campos que estão faltando.
  */
 export function validateLeadMovement(lead: Lead, targetStage: Stage): string[] {
-  const rules = (targetStage.required_fields as any[]) || [];
+  type RequiredFieldRule = { field: keyof Lead; label?: string };
+
+  const rules = Array.isArray(targetStage.required_fields)
+    ? (targetStage.required_fields as RequiredFieldRule[])
+    : [];
+
   if (rules.length === 0) return [];
 
   const missingFields: string[] = [];

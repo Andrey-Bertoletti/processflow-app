@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { supabase } from "@/lib/supabase/client";
 import { 
   Activity, Server, Database, ShieldAlert, Zap, Layers, RefreshCw, AlertOctagon, Terminal
 } from "lucide-react";
@@ -22,7 +22,6 @@ export default function ControlPlanePage() {
   });
   const [isRebuilding, setIsRebuilding] = useState(false);
   const [isReconciling, setIsReconciling] = useState(false);
-  const supabase = createClient();
 
   useEffect(() => {
     fetchStats();
@@ -38,13 +37,15 @@ export default function ControlPlanePage() {
 
   const fetchStats = async () => {
     // Busca jobs em processamento e falhos para observabilidade global
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const db = supabase as any;
     const [{ count: active }, { count: failed }, { data: usage }] = await Promise.all([
-      supabase.from("job_queue").select("*", { count: "exact", head: true }).in("status", ["pending", "processing"]),
-      supabase.from("job_queue").select("*", { count: "exact", head: true }).eq("status", "failed"),
-      supabase.from("v1_read_workspace_metrics").select("total_tokens_consumed")
+      db.from("job_queue").select("*", { count: "exact", head: true }).in("status", ["pending", "processing"]),
+      db.from("job_queue").select("*", { count: "exact", head: true }).eq("status", "failed"),
+      db.from("v1_read_workspace_metrics").select("total_tokens_consumed")
     ]);
 
-    const totalTokens = usage?.reduce((acc, curr) => acc + (curr.total_tokens_consumed || 0), 0) || 0;
+    const totalTokens = usage?.reduce((acc: number, curr: any) => acc + (curr.total_tokens_consumed || 0), 0) || 0;
     
     setStats({
       activeJobs: active || 0,
@@ -80,7 +81,8 @@ export default function ControlPlanePage() {
   const handleReconcileJobs = async () => {
     setIsReconciling(true);
     try {
-      const { error } = await supabase.rpc('reconcile_stuck_jobs');
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { error } = await (supabase as any).rpc('reconcile_stuck_jobs');
       if (error) throw error;
       alert("Reparo concluído: Jobs órfãos devolvidos à fila.");
       fetchStats();
