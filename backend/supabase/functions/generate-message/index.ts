@@ -289,13 +289,20 @@ FORMATO OBRIGATÓRIO:
   });
 
   const { error: insertMessagesError } = await supabase.from("messages").insert(
-    finalMessages.map((m) => ({
+    finalMessages.map((m, idx) => ({
       workspace_id: lead.workspace_id,
       lead_id: lead.id,
       campaign_id: campaign.id,
       content: m,
       is_automated: false,
       status: "success",
+      variation_index: idx,
+      prompt_hash: promptHash,
+      metadata: { 
+        ai_model: modelUsed, 
+        latency: latencyMs,
+        style: idx === 0 ? 'direto' : idx === 1 ? 'consultivo' : 'criativo'
+      }
     }))
   );
 
