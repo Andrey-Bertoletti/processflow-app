@@ -1,13 +1,22 @@
 -- Normalize workspace custom fields and store per-lead values relationally.
 
-ALTER TABLE public.workspace_custom_fields
-    RENAME COLUMN label TO name;
+DO $$ 
+BEGIN
+    -- Rename label to name if exists
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='workspace_custom_fields' AND column_name='label') THEN
+        ALTER TABLE public.workspace_custom_fields RENAME COLUMN label TO name;
+    END IF;
 
-ALTER TABLE public.workspace_custom_fields
-    RENAME COLUMN field_key TO key;
+    -- Rename field_key to key if exists
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='workspace_custom_fields' AND column_name='field_key') THEN
+        ALTER TABLE public.workspace_custom_fields RENAME COLUMN field_key TO key;
+    END IF;
 
-ALTER TABLE public.workspace_custom_fields
-    ADD COLUMN IF NOT EXISTS required boolean NOT NULL DEFAULT false;
+    -- Add columns if missing
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='workspace_custom_fields' AND column_name='required') THEN
+        ALTER TABLE public.workspace_custom_fields ADD COLUMN required boolean NOT NULL DEFAULT false;
+    END IF;
+END $$;
 
 ALTER TABLE public.workspace_custom_fields
     ADD COLUMN IF NOT EXISTS options jsonb NOT NULL DEFAULT '[]'::jsonb;

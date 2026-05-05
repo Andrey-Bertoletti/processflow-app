@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 type AuthContextType = {
   user: User | null;
   loading: boolean;
+  workspaces: any[]; // Adicionado: lista de workspaces permitidos
   activeWorkspaceId: string | null;
   setActiveWorkspaceId: (id: string | null) => void;
   workspaceId: string | null;
@@ -17,6 +18,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [workspaces, setWorkspaces] = useState<any[]>([]); // Lista de workspaces
   const [loading, setLoading] = useState(true);
   const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
@@ -41,8 +43,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const init = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+      
+      if (user) {
+        // Carregar workspaces permitidos (Owner + Member)
+        const { data: wsData } = await (supabase.rpc as any)("get_user_workspaces");
+        setWorkspaces(wsData || []);
+
+        // Se o activeWorkspaceId não estiver na lista (ou não existir), pega o primeiro
+        if (wsData?.length > 0) {
+          const currentId = localStorage.getItem("activeWorkspaceId");
+          const isValid = wsData.some((w: any) => w.id === currentId);
+          if (!currentId || !isValid) {
+            handleSetActiveWorkspace(wsData[0].id);
+          }
+        }
+      }
+      
       setLoading(false);
     };
 
@@ -59,7 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, loading, activeWorkspaceId, setActiveWorkspaceId: handleSetActiveWorkspace, workspaceId, setWorkspaceId }}
+      value={{ user, loading, workspaces, activeWorkspaceId, setActiveWorkspaceId: handleSetActiveWorkspace, workspaceId, setWorkspaceId }}
     >
       {children}
     </AuthContext.Provider>

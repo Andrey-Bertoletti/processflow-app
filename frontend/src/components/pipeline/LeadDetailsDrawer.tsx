@@ -18,14 +18,15 @@ type LeadDetailsDrawerProps = {
   stages: Stage[];
   members: WorkspaceMember[];
   campaigns: any[];
-  customFields: WorkspaceCustomField[];
+  customFields: any[];
+  customFieldValues?: any[]; // Adicionado: valores relacionais
   onClose: () => void;
   onSave: (payload: LeadFormPayload) => Promise<void>;
   onDelete: () => Promise<void>;
   onMoveToStage: (stageId: string) => Promise<void>;
 };
 
-function buildInitialForm(lead: Lead | null) {
+function buildInitialForm(lead: Lead | null, customFieldValues: any[] = []) {
   return {
     name: lead?.name ?? "",
     email: lead?.email ?? "",
@@ -37,8 +38,17 @@ function buildInitialForm(lead: Lead | null) {
     source: lead?.source ?? "",
     notes: lead?.notes ?? "",
     campaignId: lead?.campaign_id ?? "",
-    customFieldValues: {},
+    metadata: (lead?.metadata as Record<string, any>) ?? {},
+    customValues: buildCustomValuesMap(customFieldValues || []), // Mapeia id_campo -> valor
   };
+}
+
+function buildCustomValuesMap(values: any[]) {
+  const map: Record<string, string> = {};
+  values.forEach(v => {
+    map[v.custom_field_id] = v.value || "";
+  });
+  return map;
 }
 
 export default function LeadDetailsDrawer({
@@ -50,12 +60,13 @@ export default function LeadDetailsDrawer({
   members,
   campaigns,
   customFields,
+  customFieldValues,
   onClose,
   onSave,
   onDelete,
   onMoveToStage,
 }: LeadDetailsDrawerProps) {
-  const [form, setForm] = useState(() => buildInitialForm(lead));
+  const [form, setForm] = useState(() => buildInitialForm(lead, customFieldValues));
   const [messages, setMessages] = useState<string[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [isSending, setIsSending] = useState(false);
@@ -65,11 +76,8 @@ export default function LeadDetailsDrawer({
       return;
     }
 
-    setForm({
-      ...buildInitialForm(lead),
-      customFieldValues: buildLeadCustomFieldValuesDraft(lead, customFields),
-    });
-  }, [lead, isOpen, customFields]);
+    setForm(buildInitialForm(lead, customFieldValues));
+  }, [lead, isOpen, customFieldValues]);
 
   if (!isOpen || !lead) {
     return null;
@@ -89,8 +97,9 @@ export default function LeadDetailsDrawer({
       stageId: form.stageId,
       assignedTo: form.assignedTo || null,
       campaignId: form.campaignId || null,
-      customFieldValues: form.customFieldValues,
-    });
+      metadata: form.metadata,
+      customValues: form.customValues, // Novo: Enviado para o handler de salvamento
+    } as LeadFormPayload);
   };
 
   const handleGenerateMessages = async () => {
@@ -111,7 +120,6 @@ export default function LeadDetailsDrawer({
       
       if (error) throw error;
       
-      // A Edge Function retorna { messages: string[] }
       if (data?.messages) {
         setMessages(data.messages);
       }
@@ -123,33 +131,30 @@ export default function LeadDetailsDrawer({
     }
   };
 
-  const handleSend = async (content: string) => {
-    if (isSending) return;
+  const handleSend = async (messageId: string) => {
+    if (isSending || !user) return;
     
     setIsSending(true);
     try {
-      const { data, error } = await (supabase.rpc as any)("send_message_and_move_lead", {
+      const { data, error } = await (supabase.rpc as any)("send_message_simulated", {
+        p_message_id: messageId,
         p_lead_id: lead.id,
-        p_content: content,
-        p_campaign_id: form.campaignId || null
+        p_user_id: user.id
       });
 
       if (error) throw error;
 
-      toast.success("Mensagem enviada com sucesso! O lead foi movido para a etapa de contato.");
+      toast.success("Abordagem iniciada! Lead movido para 'Tentando Contato'.");
       
-      // Fecha o drawer e recarrega o pipeline para refletir a mudança de etapa
       onClose();
-      window.location.reload(); // Forma simples de atualizar o pipeline, ou use loadPipeline se disponível
+      window.location.reload(); 
     } catch (error: any) {
       console.error("[SEND_ERROR]", error);
-      toast.error(error?.message || "Erro ao enviar mensagem.");
+      toast.error(error?.message || "Erro ao simular envio.");
     } finally {
       setIsSending(false);
     }
   };
-
-
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-sm">
@@ -167,42 +172,6 @@ export default function LeadDetailsDrawer({
           <p><span className="font-mono text-slate-500">Criado em:</span> {lead.created_at ? new Date(lead.created_at).toLocaleString() : "-"}</p>
           <p><span className="font-mono text-slate-500">Atualizado em:</span> {lead.updated_at ? new Date(lead.updated_at).toLocaleString() : "-"}</p>
         </div>
-
-        {/* Phase 10: AI Insight Card */}
-        {(lead as any).lead_insights?.[0] && (() => {
-          const insight = (lead as any).lead_insights[0];
-          return (
-            <div className="mb-5 rounded-xl border border-slate-700/60 bg-gradient-to-br from-indigo-950/40 to-slate-900/80 p-4 shadow-lg ring-1 ring-white/5">
-              <div className="mb-3 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
-                    🧠
-                  </span>
-                  <h3 className="font-bold text-white">AI Sales Insight</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 
-                    ${insight.sentiment === 'hot' ? 'bg-rose-500/20 text-rose-300 ring-rose-500/40' : 
-                      insight.sentiment === 'warm' ? 'bg-amber-500/20 text-amber-300 ring-amber-500/40' : 
-                      'bg-blue-500/20 text-blue-300 ring-blue-500/40'}`}>
-                    {insight.sentiment.toUpperCase()}
-                  </span>
-                  <span className="text-lg font-black text-white">{insight.score}%</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ação Recomendada (Next Best Action)</p>
-                  <p className="text-sm font-semibold text-emerald-300">{insight.recommended_action}</p>
-                </div>
-                <div>
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Raciocínio</p>
-                  <p className="text-xs text-slate-300 leading-relaxed">{insight.reasoning}</p>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <TextField
@@ -248,20 +217,25 @@ export default function LeadDetailsDrawer({
             placeholder="Ex: LinkedIn, Indicação..."
           />
 
-          <LeadCustomFieldInputs
-            fields={customFields}
-            values={form.customFieldValues}
-            onChange={(fieldId, value) => setForm((current) => ({
-              ...current,
-              customFieldValues: {
-                ...current.customFieldValues,
-                [fieldId]: value,
-              },
-            }))}
-          />
+          {customFields.map((field) => (
+            <TextField
+              key={field.id}
+              label={field.label || field.name}
+              type={field.field_type === 'number' ? 'number' : 'text'}
+              value={form.customValues[field.id] || ""}
+              onChange={(event) => setForm((current) => ({
+                ...current,
+                customValues: {
+                  ...current.customValues,
+                  [field.id]: event.target.value
+                }
+              }))}
+              placeholder={`Preencha ${ (field.label || field.name).toLowerCase() }...`}
+              required={field.is_required}
+            />
+          ))}
 
           <div className="space-y-1.5">
-
             <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Observações</label>
             <textarea
               className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none"
@@ -329,61 +303,111 @@ export default function LeadDetailsDrawer({
               <span className="text-xl">💬</span>
               <h3 className="font-bold text-white">Mensagens IA</h3>
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleGenerateMessages}
-              disabled={loadingMessages || !form.campaignId}
-              className="text-xs"
-            >
-              {loadingMessages ? "Gerando..." : "✨ Gerar Sugestões"}
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => handleGenerateMessages(false)}
+                disabled={loadingMessages || !form.campaignId}
+                className="text-xs"
+              >
+                {loadingMessages ? "Buscando..." : "✨ Ver Sugestões"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleGenerateMessages(true)}
+                disabled={loadingMessages || !form.campaignId}
+                className="text-xs"
+                title="Forçar IA a gerar novas opções"
+              >
+                {loadingMessages ? "Gerando..." : "🔄 Regenerar"}
+              </Button>
+            </div>
+
 
           </div>
 
           <div className="space-y-4">
-            {messages.length === 0 && (
+            {messages.length === 0 && !(lead as any).messages?.length && (
               <p className="py-4 text-center text-xs text-slate-500 italic">
                 Nenhuma mensagem gerada para este lead ainda.
               </p>
             )}
-            {messages.map((content, idx) => (
-              <div key={idx} className="group relative rounded-lg border border-slate-700 bg-slate-900/50 p-4 transition-all hover:border-indigo-500/40">
-                <p className="text-sm leading-relaxed text-slate-200">{content}</p>
-                <div className="mt-3 flex items-center justify-end border-t border-slate-700/50 pt-3">
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="px-2 py-1 text-[10px]"
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(content);
-                          alert("Mensagem copiada para a área de transferência! 📋");
-                        } catch (err) {
-                          console.error("Erro ao copiar:", err);
-                          alert("Não foi possível copiar automaticamente. Por favor, selecione o texto e copie manualmente.");
-                        }
-                      }}
-                    >
-                      Copiar
-                    </Button>
-
-                    <Button
-                      type="button"
-                      variant="primary"
-                      className="px-2 py-1 text-[10px]"
-                      disabled={isSending}
-                      onClick={() => handleSend(content)}
-                    >
-                      {isSending ? "Enviando..." : "Enviar"}
-                    </Button>
-
+            
+            {(lead as any).messages?.map((msg: any, idx: number) => {
+              const styles = ["Direto", "Consultivo", "Criativo"];
+              return (
+                <div key={msg.id} className="group relative rounded-lg border border-slate-700 bg-slate-900/50 p-4 transition-all hover:border-indigo-500/40">
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Estilo: {msg.metadata?.style || styles[msg.variation_index] || "IA"}</span>
+                    {msg.status === 'sent' && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">ENVIADA</span>}
+                  </div>
+                  <p className="text-sm leading-relaxed text-slate-200">{msg.content}</p>
+                  <div className="mt-3 flex items-center justify-end border-t border-slate-700/50 pt-3">
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        className="px-2 py-1 text-[10px]"
+                        onClick={async () => {
+                          try {
+                            await navigator.clipboard.writeText(msg.content);
+                            toast.success("Copiado!");
+                          } catch (err) {
+                            alert("Copie manualmente: " + msg.content);
+                          }
+                        }}
+                      >
+                        Copiar
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="primary"
+                        className="px-2 py-1 text-[10px]"
+                        disabled={isSending || msg.status === 'sent'}
+                        onClick={() => handleSend(msg.id)}
+                      >
+                        {isSending ? "Enviando..." : msg.status === 'sent' ? "Enviada" : "Enviar"}
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
+          </div>
+        </section>
+        
+        {/* Phase 11: Timeline Section */}
+        <section className="mt-8 space-y-4">
+          <div className="flex items-center gap-2 border-b border-slate-700/50 pb-2">
+            <span className="text-xl">⏳</span>
+            <h3 className="font-bold text-white">Linha do Tempo</h3>
+          </div>
+          
+          <div className="space-y-4">
+            {((lead as any).lead_events || []).length === 0 && (
+              <p className="text-center text-xs text-slate-500 italic py-2">Sem histórico disponível.</p>
+            )}
+            
+            {((lead as any).lead_events || [])
+              .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+              .map((event: any) => (
+                <div key={event.id} className="relative pl-6 border-l-2 border-slate-700 pb-2 last:pb-0">
+                  <div className="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full border-2 border-slate-900 bg-indigo-500" />
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      {new Date(event.created_at).toLocaleString()}
+                    </span>
+                    <p className="text-xs font-semibold text-slate-200">
+                      {event.type === 'message_sent' ? '📨 Mensagem Enviada' : 
+                       event.type === 'stage_changed' ? '🚀 Mudança de Etapa' : event.type}
+                    </p>
+                    <p className="text-[11px] text-slate-400 leading-tight mt-0.5">{event.description}</p>
+                  </div>
+                </div>
+              ))}
           </div>
         </section>
 

@@ -166,7 +166,7 @@ export default function PipelinePage() {
       return;
     }
 
-    // Busca o lead e a etapa de destino para validaÃ§Ã£o
+    // Busca o lead e a etapa de destino para validação
     const lead = stages.flatMap((s: StageWithLeads) => s.leads).find((l: Lead) => l.id === leadId);
     const targetStage = stages.find((s: StageWithLeads) => s.id === targetStageId);
 
@@ -220,7 +220,7 @@ export default function PipelinePage() {
       setStages(previousStages);
       const message = err instanceof Error ? err.message : "Erro ao mover lead";
       setError(message);
-      toast.error(`NÃ£o foi possÃ­vel mover: ${message}`);
+      toast.error(`Não foi possível mover: ${message}`);
     } finally {
       setIsSavingMove(false);
     }
@@ -242,7 +242,23 @@ export default function PipelinePage() {
 
     try {
       const createdLead = await createLeadInWorkspace({ workspaceId: activeWorkspaceId, payload });
-      updateLeadInState(createdLead);
+      
+      if (payload.customValues && Object.keys(payload.customValues).length > 0) {
+        const valueEntries = Object.entries(payload.customValues).map(([fieldId, value]) => ({
+          lead_id: createdLead.id,
+          custom_field_id: fieldId,
+          value: value,
+          workspace_id: activeWorkspaceId,
+        }));
+
+        const { error: customFieldsError } = await supabase
+          .from("lead_custom_field_values")
+          .insert(valueEntries);
+
+        if (customFieldsError) throw customFieldsError;
+      }
+
+      await loadPipeline();
       setIsCreateDrawerOpen(false);
       toast.success(`Lead "${createdLead.name}" criado com sucesso!`);
     } catch (err) {
@@ -277,7 +293,22 @@ export default function PipelinePage() {
         expectedUpdatedAt: selectedLead.updated_at,
       });
 
-      updateLeadInState(updatedLead);
+      if (payload.customValues && Object.keys(payload.customValues).length > 0) {
+        const valueEntries = Object.entries(payload.customValues).map(([fieldId, value]) => ({
+          lead_id: updatedLead.id,
+          custom_field_id: fieldId,
+          value: value,
+          workspace_id: activeWorkspaceId,
+        }));
+
+        const { error: customFieldsError } = await supabase
+          .from("lead_custom_field_values")
+          .upsert(valueEntries, { onConflict: 'lead_id, custom_field_id' });
+
+        if (customFieldsError) throw customFieldsError;
+      }
+
+      await loadPipeline();
       setSelectedLeadId(updatedLead.id);
       toast.success("Lead atualizado!");
     } catch (err) {
@@ -471,6 +502,7 @@ export default function PipelinePage() {
         members={members}
         campaigns={campaigns}
         customFields={customFields}
+        customFieldValues={selectedLead?.lead_custom_field_values}
         onClose={() => setSelectedLeadId(null)}
         onSave={handleUpdateLead}
         onDelete={handleDeleteLead}

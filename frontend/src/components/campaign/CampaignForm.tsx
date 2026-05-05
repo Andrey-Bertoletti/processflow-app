@@ -17,9 +17,26 @@ export default function CampaignForm({ campaign, onClose, onSaved }: Props) {
   const [name, setName] = useState(campaign?.name ?? "");
   const [context, setContext] = useState(campaign?.context ?? "");
   const [basePrompt, setBasePrompt] = useState(campaign?.base_prompt ?? "");
+  const [triggerStageId, setTriggerStageId] = useState("");
+  const [stages, setStages] = useState<any[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   
   const { activeWorkspaceId } = useAuth();
+
+  useEffect(() => {
+    if (activeWorkspaceId) {
+      // Carregar etapas
+      supabase.from("stages").select("id, name, auto_campaign_id").eq("workspace_id", activeWorkspaceId)
+        .then(({ data }) => {
+          setStages(data || []);
+          // Se estamos editando, encontrar qual etapa aponta para esta campanha
+          if (campaign) {
+            const linkedStage = data?.find(s => s.auto_campaign_id === campaign.id);
+            if (linkedStage) setTriggerStageId(linkedStage.id);
+          }
+        });
+    }
+  }, [activeWorkspaceId, campaign]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,17 +50,31 @@ export default function CampaignForm({ campaign, onClose, onSaved }: Props) {
       workspace_id: activeWorkspaceId,
     };
 
-    const { error } = campaign
+    const { data: savedCampaign, error: campaignError } = campaign
       ? await supabase
           .from("campaigns")
           .update({ name: payload.name, context: payload.context, base_prompt: payload.base_prompt })
           .eq("id", campaign.id)
-      : await supabase.from("campaigns").insert(payload);
+          .select().single()
+      : await supabase.from("campaigns").insert(payload).select().single();
 
-    if (error) {
-      console.error("[CAMPAIGN_SAVE_ERR]", error);
+    if (campaignError) {
+      console.error("[CAMPAIGN_SAVE_ERR]", campaignError);
       alert("Erro ao salvar campanha.");
     } else {
+      const campId = savedCampaign.id;
+
+      // 1. Limpar vinculos antigos desta campanha em qualquer etapa do workspace
+      await supabase.from("stages").update({ auto_campaign_id: null })
+        .eq("workspace_id", activeWorkspaceId)
+        .eq("auto_campaign_id", campId);
+
+      // 2. Vincular à nova etapa se selecionada
+      if (triggerStageId) {
+        await supabase.from("stages").update({ auto_campaign_id: campId })
+          .eq("id", triggerStageId);
+      }
+
       onSaved();
       onClose();
     }
@@ -106,7 +137,24 @@ export default function CampaignForm({ campaign, onClose, onSaved }: Props) {
             />
           </div>
 
+          <div className="space-y-2">
+            <label className="app-label">Etapa Gatilho (Automação)</label>
+            <p className="text-[10px] text-slate-500 mb-1">Selecione uma etapa para disparar esta campanha automaticamente ao entrar.</p>
+            <select
+              className="app-input"
+              value={triggerStageId}
+              onChange={e => setTriggerStageId(e.target.value)}
+              disabled={isSaving}
+            >
+              <option value="">Nenhuma (Manual)</option>
+              {stages.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+
           <div className="flex justify-end gap-3 pt-4 border-t border-slate-800/50">
+
             <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
               Cancelar
             </Button>
