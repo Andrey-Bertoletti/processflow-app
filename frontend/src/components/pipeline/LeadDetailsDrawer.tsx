@@ -75,6 +75,42 @@ export default function LeadDetailsDrawer({
           <p><span className="font-mono text-slate-500">Atualizado em:</span> {lead.updated_at ? new Date(lead.updated_at).toLocaleString() : "-"}</p>
         </div>
 
+        {/* Phase 10: AI Insight Card */}
+        {(lead as any).lead_insights?.[0] && (() => {
+          const insight = (lead as any).lead_insights[0];
+          return (
+            <div className="mb-5 rounded-xl border border-slate-700/60 bg-gradient-to-br from-indigo-950/40 to-slate-900/80 p-4 shadow-lg ring-1 ring-white/5">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-500/20 text-indigo-400">
+                    🧠
+                  </span>
+                  <h3 className="font-bold text-white">AI Sales Insight</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 
+                    ${insight.sentiment === 'hot' ? 'bg-rose-500/20 text-rose-300 ring-rose-500/40' : 
+                      insight.sentiment === 'warm' ? 'bg-amber-500/20 text-amber-300 ring-amber-500/40' : 
+                      'bg-blue-500/20 text-blue-300 ring-blue-500/40'}`}>
+                    {insight.sentiment.toUpperCase()}
+                  </span>
+                  <span className="text-lg font-black text-white">{insight.score}%</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Ação Recomendada (Next Best Action)</p>
+                  <p className="text-sm font-semibold text-emerald-300">{insight.recommended_action}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Raciocínio</p>
+                  <p className="text-xs text-slate-300 leading-relaxed">{insight.reasoning}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
         <form className="space-y-4" onSubmit={handleSubmit}>
           <TextField
             label="Nome"

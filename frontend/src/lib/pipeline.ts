@@ -9,7 +9,7 @@ export type StageWithLeads = Stage & {
 export async function fetchPipelineData(workspaceId: string): Promise<StageWithLeads[]> {
   const { data: stages, error: stagesError } = await supabase
     .from("stages")
-    .select("*, leads(*)")
+    .select("*, leads(*, lead_insights(*))")
     .eq("workspace_id", workspaceId)
     .order("order", { ascending: true })
     .order("created_at", { ascending: false, foreignTable: "leads" });
