@@ -17,6 +17,6 @@ O Supabase CLI espera migrations em `backend/supabase/migrations/`. Para manter 
 
 ## Gerando `schema.sql` (opcional)
 
-1) `cd backend/supabase`
-2) `supabase db dump --schema public --file ../../database/schema.sql`
+1) `cd backend`
+2) `supabase db dump --schema public --file ../database/schema.sql`
 

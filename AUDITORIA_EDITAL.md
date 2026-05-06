@@ -60,7 +60,7 @@ Este documento apresenta a auditoria técnica final do projeto **ProcessFlow**, 
 
 | Diferencial | Status | Descrição |
 | :--- | :--- | :--- |
-| **Geração Proativa** | ✅ Completo | O sistema trabalha em background via `automation_jobs`. |
+| **Geração Proativa** | ✅ Completo | O sistema trabalha em background via `job_queue` + Edge Function `ai-worker`. |
 | **Timeline Visual** | ✅ Completo | Histórico rico com ícones e status de interações. |
 | **Fila de Jobs** | ✅ Completo | Arquitetura resiliente para lidar com latência da OpenAI. |
 | **Multi-tenancy** | ✅ Completo | Usuários podem colaborar no mesmo ambiente de forma segura. |
