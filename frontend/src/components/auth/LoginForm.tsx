@@ -30,6 +30,7 @@ export default function LoginForm() {
       });
 
       if (error) {
+        console.error("Erro no Auth do Supabase:", error);
         alert(error.message);
         return;
       }
@@ -38,11 +39,17 @@ export default function LoginForm() {
       if (!user) throw new Error("Usuário não encontrado após login");
 
       // Verifica se o usuário já tem workspaces
-      const { data: workspaces } = await supabase
+      const { data: workspaces, error: wsError } = await supabase
         .from("workspaces")
         .select("id")
         .eq("owner_id", user.id)
         .limit(1);
+
+      if (wsError) {
+        console.error("Erro ao buscar workspaces:", wsError);
+        alert(`Erro de Banco: ${wsError.message}`);
+        return;
+      }
 
       if (workspaces && workspaces.length > 0) {
         router.push("/auth/dashboard");
@@ -50,6 +57,9 @@ export default function LoginForm() {
         router.push("/auth/workspace/create");
       }
 
+    } catch (err: any) {
+      console.error("Erro inesperado no login:", err);
+      alert(err.message || "Erro desconhecido");
     } finally {
       setLoading(false);
     }
