@@ -288,28 +288,31 @@ FORMATO OBRIGATÓRIO:
     latency_ms: latencyMs,
   });
 
-  const { error: insertMessagesError } = await supabase.from("messages").insert(
-    finalMessages.map((m, idx) => ({
-      workspace_id: lead.workspace_id,
-      lead_id: lead.id,
-      campaign_id: campaign.id,
-      content: m,
-      is_automated: false,
-      status: "success",
-      variation_index: idx,
-      prompt_hash: promptHash,
-      metadata: { 
-        ai_model: modelUsed, 
-        latency: latencyMs,
-        style: idx === 0 ? 'direto' : idx === 1 ? 'consultivo' : 'criativo'
-      }
-    }))
-  );
+  const { data: savedMessages, error: insertMessagesError } = await supabase
+    .from("messages")
+    .insert(
+      finalMessages.map((m, idx) => ({
+        workspace_id: lead.workspace_id,
+        lead_id: lead.id,
+        campaign_id: campaign.id,
+        content: m,
+        is_automated: false,
+        status: "success",
+        variation_index: idx,
+        prompt_hash: promptHash,
+        metadata: { 
+          ai_model: modelUsed, 
+          latency: latencyMs,
+          style: idx === 0 ? 'direto' : idx === 1 ? 'consultivo' : 'criativo'
+        }
+      }))
+    )
+    .select();
 
   if (insertMessagesError) {
     return jsonResponse({ error: "Failed to persist generated messages.", messages: [] }, 500);
   }
 
-  return jsonResponse({ messages: finalMessages }, 200);
+  return jsonResponse({ messages: savedMessages }, 200);
 });
 

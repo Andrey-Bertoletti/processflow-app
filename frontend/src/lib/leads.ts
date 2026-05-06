@@ -66,6 +66,7 @@ export async function createLeadInWorkspace(params: {
       campaign_id: payload.campaignId,
       metadata,
     })
+    .select()
     .single();
 
   if (error) {

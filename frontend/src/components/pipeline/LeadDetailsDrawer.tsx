@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { Lead, LeadFormPayload, Stage, WorkspaceMember, WorkspaceCustomField } from "@/types/database.types";
+import { useAuth } from "@/app/context/AuthContext";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { SelectField, TextField } from "@/components/ui/Field";
@@ -67,8 +68,9 @@ export default function LeadDetailsDrawer({
   onMoveToStage,
 }: LeadDetailsDrawerProps) {
   const [form, setForm] = useState(() => buildInitialForm(lead, customFieldValues));
-  const [messages, setMessages] = useState<string[]>([]);
-  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [localMessages, setLocalMessages] = useState<any[]>([]);
+  const { user } = useAuth();
+  const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
 
   useEffect(() => {
@@ -102,32 +104,35 @@ export default function LeadDetailsDrawer({
     } as LeadFormPayload);
   };
 
-  const handleGenerateMessages = async () => {
+  const handleGenerateMessages = async (forceRegenerate = false) => {
     if (!form.campaignId) {
-      toast.error("Selecione uma campanha para gerar as mensagens.");
+      toast.error("Selecione uma campanha primeiro.");
       return;
     }
-    
-    setLoadingMessages(true);
+
+    setIsGenerating(true);
     try {
       const { data, error } = await supabase.functions.invoke("generate-message", {
-        body: {
-          lead_id: lead.id,
+        body: { 
+          lead_id: lead.id, 
           campaign_id: form.campaignId,
           variations_count: 3,
+          force_regenerate: forceRegenerate
         },
       });
       
       if (error) throw error;
       
+      // Se a Edge Function retorna um array de objetos de mensagem
       if (data?.messages) {
-        setMessages(data.messages);
+        setLocalMessages(data.messages);
+        toast.success(forceRegenerate ? "Novas sugestões geradas!" : "Sugestões carregadas!");
       }
     } catch (error: any) {
       console.error("[GENERATE_ERROR]", error);
       toast.error(error?.message || "Erro ao gerar mensagens.");
     } finally {
-      setLoadingMessages(false);
+      setIsGenerating(false);
     }
   };
 
@@ -138,8 +143,7 @@ export default function LeadDetailsDrawer({
     try {
       const { data, error } = await (supabase.rpc as any)("send_message_simulated", {
         p_message_id: messageId,
-        p_lead_id: lead.id,
-        p_user_id: user.id
+        p_lead_id: lead.id
       });
 
       if (error) throw error;
@@ -308,20 +312,20 @@ export default function LeadDetailsDrawer({
                 type="button"
                 variant="secondary"
                 onClick={() => handleGenerateMessages(false)}
-                disabled={loadingMessages || !form.campaignId}
+                disabled={isGenerating || !form.campaignId}
                 className="text-xs"
               >
-                {loadingMessages ? "Buscando..." : "✨ Ver Sugestões"}
+                {isGenerating ? "Buscando..." : "✨ Ver Sugestões"}
               </Button>
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => handleGenerateMessages(true)}
-                disabled={loadingMessages || !form.campaignId}
+                disabled={isGenerating || !form.campaignId}
                 className="text-xs"
                 title="Forçar IA a gerar novas opções"
               >
-                {loadingMessages ? "Gerando..." : "🔄 Regenerar"}
+                {isGenerating ? "Gerando..." : "🔄 Regenerar"}
               </Button>
             </div>
 
@@ -329,52 +333,66 @@ export default function LeadDetailsDrawer({
           </div>
 
           <div className="space-y-4">
-            {messages.length === 0 && !(lead as any).messages?.length && (
+            {localMessages.length === 0 && !(lead as any).messages?.length && (
               <p className="py-4 text-center text-xs text-slate-500 italic">
                 Nenhuma mensagem gerada para este lead ainda.
               </p>
             )}
             
-            {(lead as any).messages?.map((msg: any, idx: number) => {
-              const styles = ["Direto", "Consultivo", "Criativo"];
-              return (
-                <div key={msg.id} className="group relative rounded-lg border border-slate-700 bg-slate-900/50 p-4 transition-all hover:border-indigo-500/40">
-                  <div className="mb-2 flex items-center justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">Estilo: {msg.metadata?.style || styles[msg.variation_index] || "IA"}</span>
-                    {msg.status === 'sent' && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">ENVIADA</span>}
-                  </div>
-                  <p className="text-sm leading-relaxed text-slate-200">{msg.content}</p>
-                  <div className="mt-3 flex items-center justify-end border-t border-slate-700/50 pt-3">
-                    <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        className="px-2 py-1 text-[10px]"
-                        onClick={async () => {
-                          try {
-                            await navigator.clipboard.writeText(msg.content);
-                            toast.success("Copiado!");
-                          } catch (err) {
-                            alert("Copie manualmente: " + msg.content);
-                          }
-                        }}
-                      >
-                        Copiar
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="primary"
-                        className="px-2 py-1 text-[10px]"
-                        disabled={isSending || msg.status === 'sent'}
-                        onClick={() => handleSend(msg.id)}
-                      >
-                        {isSending ? "Enviando..." : msg.status === 'sent' ? "Enviada" : "Enviar"}
-                      </Button>
+            {/* Unificar mensagens do banco com locais (recém geradas) */}
+            {[...((lead as any).messages || []), ...localMessages]
+              .filter((msg, index, self) => 
+                // Evitar duplicatas se a mesma mensagem aparecer no banco e no local
+                index === self.findIndex((m) => (m.id && m.id === msg.id) || m.content === msg.content)
+              )
+              .sort((a, b) => (a.variation_index ?? 0) - (b.variation_index ?? 0))
+              .map((msg: any) => {
+                const styles = ["Direto", "Consultivo", "Criativo"];
+                const styleName = msg.metadata?.style || styles[msg.variation_index] || "IA";
+                
+                return (
+                  <div key={msg.id || msg.content} className="group relative rounded-lg border border-slate-700 bg-slate-900/50 p-4 transition-all hover:border-indigo-500/40">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+                        Estilo: {styleName}
+                      </span>
+                      {msg.status === 'sent' && (
+                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">ENVIADA</span>
+                      )}
+                    </div>
+                    <p className="text-sm leading-relaxed text-slate-200">{msg.content}</p>
+                    <div className="mt-3 flex items-center justify-end border-t border-slate-700/50 pt-3">
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          className="px-2 py-1 text-[10px]"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(msg.content);
+                              toast.success("Copiado!");
+                            } catch (err) {
+                              alert("Copie manualmente: " + msg.content);
+                            }
+                          }}
+                        >
+                          Copiar
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="primary"
+                          className="px-2 py-1 text-[10px]"
+                          disabled={isSending || msg.status === 'sent' || !msg.id}
+                          title={!msg.id ? "Salve ou recarregue para enviar mensagens recém geradas" : ""}
+                          onClick={() => handleSend(msg.id)}
+                        >
+                          {isSending ? "Enviando..." : msg.status === 'sent' ? "Enviada" : "Enviar"}
+                        </Button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
 
           </div>
         </section>

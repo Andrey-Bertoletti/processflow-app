@@ -1,4 +1,6 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 :root {
   --background: #07111f;
@@ -18,13 +20,6 @@
   --shadow-lg: 0 24px 80px rgba(1, 7, 20, 0.45);
   --radius-lg: 1rem;
   --radius-md: 0.75rem;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: "Inter", "Segoe UI", "SF Pro Display", sans-serif;
-  --font-mono: "SFMono-Regular", "Consolas", monospace;
 }
 
 html {

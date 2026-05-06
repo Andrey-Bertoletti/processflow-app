@@ -243,8 +243,8 @@ export default function PipelinePage() {
     try {
       const createdLead = await createLeadInWorkspace({ workspaceId: activeWorkspaceId, payload });
       
-      if (payload.customValues && Object.keys(payload.customValues).length > 0) {
-        const valueEntries = Object.entries(payload.customValues).map(([fieldId, value]) => ({
+      if (payload.customFieldValues && Object.keys(payload.customFieldValues).length > 0) {
+        const valueEntries = Object.entries(payload.customFieldValues).map(([fieldId, value]) => ({
           lead_id: createdLead.id,
           custom_field_id: fieldId,
           value: value,
@@ -293,8 +293,8 @@ export default function PipelinePage() {
         expectedUpdatedAt: selectedLead.updated_at,
       });
 
-      if (payload.customValues && Object.keys(payload.customValues).length > 0) {
-        const valueEntries = Object.entries(payload.customValues).map(([fieldId, value]) => ({
+      if (payload.customFieldValues && Object.keys(payload.customFieldValues).length > 0) {
+        const valueEntries = Object.entries(payload.customFieldValues).map(([fieldId, value]) => ({
           lead_id: updatedLead.id,
           custom_field_id: fieldId,
           value: value,

@@ -8,11 +8,13 @@ vi.mock("@/lib/supabase/client", () => ({
   supabase: {
     from: () => ({
       insert: insertMock,
-      update: vi.fn(),
+      update: vi.fn().mockReturnThis(),
+      delete: vi.fn().mockReturnThis(),
       select: selectMock,
-      order: vi.fn(),
+      order: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
       not: vi.fn().mockReturnThis(),
+      single: singleMock,
     }),
     rpc: vi.fn(),
   },
@@ -23,6 +25,8 @@ describe("pipeline integration", () => {
     insertMock.mockReset();
     selectMock.mockReset();
     singleMock.mockReset();
+
+    selectMock.mockReturnThis();
 
     singleMock.mockResolvedValue({
       data: {
@@ -66,6 +70,7 @@ describe("pipeline integration", () => {
       stage_id: "stage-1",
       assigned_to: null,
       campaign_id: null,
+      metadata: {},
     });
   });
 });
