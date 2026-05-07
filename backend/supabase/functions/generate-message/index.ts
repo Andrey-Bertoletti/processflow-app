@@ -145,6 +145,24 @@ serve(async (req) => {
     return jsonResponse({ error: "Lead and campaign must belong to the same workspace." }, 400);
   }
 
+  // Hard authorization guard:
+  // Edge Functions may run with elevated keys; always enforce workspace membership explicitly.
+  const { data: membership, error: membershipError } = await supabase
+    .from("workspace_users")
+    .select("id")
+    .eq("workspace_id", lead.workspace_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (membershipError) {
+    console.error("[AUTHZ_WORKSPACE_ERR]", membershipError);
+    return jsonResponse({ error: "Failed to authorize request." }, 500);
+  }
+
+  if (!membership) {
+    return jsonResponse({ error: "Forbidden" }, 403);
+  }
+
   const metadata = typeof lead.metadata === "object" && lead.metadata ? lead.metadata : {};
 
   const customLines: string[] = [];

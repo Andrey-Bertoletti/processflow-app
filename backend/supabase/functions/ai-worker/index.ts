@@ -383,8 +383,65 @@ FORMATO OBRIGATÓRIO:
 
       try {
         const hasExceededRetries = Number(lockedJob.attempts ?? 0) >= Number(lockedJob.max_attempts ?? 3);
+        const payload = lockedJob.payload ?? {};
+        const leadId = payload.lead_id;
+        const campaignId = payload.campaign_id;
+        const workspaceId = payload.workspace_id;
+        const stageId = payload.stage_id;
+
+        const updatePlaceholderStatus = async (finalStatus: "pending" | "failed") => {
+          if (!isUuid(leadId) || !isUuid(campaignId) || !isUuid(workspaceId)) return;
+
+          const { data: placeholders, error: placeholderError } = await supabaseAdmin
+            .from("messages")
+            .select("id, metadata")
+            .eq("workspace_id", workspaceId)
+            .eq("lead_id", leadId)
+            .eq("campaign_id", campaignId)
+            .eq("is_automated", true)
+            .eq("status", "pending")
+            .contains("metadata", { origin: "trigger_stage" })
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+          if (placeholderError) throw placeholderError;
+
+          const placeholder = placeholders?.[0] as any;
+          const placeholderId = placeholder?.id ?? null;
+          if (!placeholderId) return;
+
+          const prevMetadata = placeholder?.metadata;
+          const mergedMetadata = {
+            ...(typeof prevMetadata === "object" && prevMetadata ? prevMetadata : {}),
+            origin: "trigger_stage",
+            stage_id: stageId ?? null,
+            last_error: errorLog,
+            last_error_at: new Date().toISOString(),
+            attempts: Number(lockedJob.attempts ?? 0),
+            max_attempts: Number(lockedJob.max_attempts ?? 3),
+          };
+
+          const content =
+            finalStatus === "failed"
+              ? "Falha ao gerar a mensagem automática. Você pode abrir o lead e regenerar manualmente."
+              : "A IA está redigindo uma mensagem...";
+
+          const { error: updateError } = await supabaseAdmin
+            .from("messages")
+            .update({
+              status: finalStatus,
+              content,
+              metadata: mergedMetadata,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", placeholderId);
+
+          if (updateError) throw updateError;
+        };
+
         if (hasExceededRetries) {
           await supabaseAdmin.rpc("route_to_dlq", { p_job_id: lockedJob.id, p_error: errorLog });
+          await updatePlaceholderStatus("failed");
         } else {
           const backoffMinutes = Math.pow(2, Number(lockedJob.attempts ?? 0));
           const nextRetry = new Date(Date.now() + backoffMinutes * 60 * 1000).toISOString();
@@ -397,6 +454,7 @@ FORMATO OBRIGATÓRIO:
               updated_at: new Date().toISOString(),
             })
             .eq("id", lockedJob.id);
+          await updatePlaceholderStatus("pending");
         }
       } catch {
         // ignore secondary failures

@@ -67,6 +67,39 @@ serve(async (req) => {
   const leadId = body?.lead_id ?? body?.leadId;
   if (!isUuid(leadId)) return jsonResponse({ error: "lead_id is required (UUID)." }, 400);
 
+  // Hard authorization guard:
+  // Edge Functions may run with elevated keys; always enforce workspace membership explicitly.
+  const { data: lead, error: leadError } = await supabase
+    .from("leads")
+    .select("id, workspace_id")
+    .eq("id", leadId)
+    .maybeSingle();
+
+  if (leadError) {
+    console.error("[SEMANTIC_LEAD_LOAD_ERR]", leadError);
+    return jsonResponse({ error: "Failed to load lead." }, 500);
+  }
+
+  if (!lead) {
+    return jsonResponse({ error: "Forbidden" }, 403);
+  }
+
+  const { data: membership, error: membershipError } = await supabase
+    .from("workspace_users")
+    .select("id")
+    .eq("workspace_id", (lead as any).workspace_id)
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (membershipError) {
+    console.error("[SEMANTIC_AUTHZ_ERR]", membershipError);
+    return jsonResponse({ error: "Failed to authorize request." }, 500);
+  }
+
+  if (!membership) {
+    return jsonResponse({ error: "Forbidden" }, 403);
+  }
+
   const { data: activities, error: actError } = await supabase
     .from("activities")
     .select("*")
