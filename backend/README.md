@@ -29,7 +29,7 @@ Nota: o Supabase CLI deve ser executado a partir de `backend/` (workdir), pois e
 O fluxo de automaÃ§Ã£o por etapa usa:
 - `stages.auto_campaign_id` como vÃ­nculo "etapa gatilho" â†’ campanha.
 - Trigger no banco (`AFTER INSERT OR UPDATE OF stage_id ON public.leads`) para enfileirar um job em `public.job_queue` (`type = 'generate_ai_message'`) e criar/atualizar uma mensagem placeholder `pending` em `public.messages` (`metadata.origin = 'trigger_stage'`).
-- Edge Function `ai-worker` para consumir `job_queue` e transformar `pending` â†’ `success` (mensagens geradas).
+- Edge Function `ai-worker` para consumir `job_queue` e transformar `pending` → `generated` (mensagens geradas).
 
 ### Rodando manualmente (local)
 

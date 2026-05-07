@@ -37,16 +37,16 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method Not Allowed" }, 405);
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return jsonResponse({ error: "Server misconfigured: missing Supabase env vars." }, 500);
+  const projectUrl = Deno.env.get("PROJECT_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+  if (!projectUrl || !serviceRoleKey) {
+    return jsonResponse({ error: "Server misconfigured: missing Supabase env vars (PROJECT_URL and SERVICE_ROLE_KEY)." }, 500);
   }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createClient(projectUrl, serviceRoleKey, {
     global: { headers: { Authorization: authHeader } },
     auth: { persistSession: false },
   });

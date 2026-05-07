@@ -20,9 +20,19 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
+    const projectUrl = Deno.env.get('PROJECT_URL') ?? '';
+    const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
+
+    if (!projectUrl) {
+      return new Response(JSON.stringify({ error: "Server misconfigured: missing required env var PROJECT_URL." }), { status: 500, headers: corsHeaders });
+    }
+    if (!serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Server misconfigured: missing required env var SERVICE_ROLE_KEY." }), { status: 500, headers: corsHeaders });
+    }
+
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectUrl,
+      serviceRoleKey
     );
 
     // Endpoint especial de REBUILD ENGINE

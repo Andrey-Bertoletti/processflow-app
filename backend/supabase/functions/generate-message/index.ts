@@ -72,16 +72,29 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (req.method !== "POST") return jsonResponse({ error: "Method Not Allowed" }, 405);
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
-  if (!supabaseUrl || !supabaseAnonKey) {
-    return jsonResponse({ error: "Server misconfigured: missing Supabase env vars." }, 500);
+  const projectUrl = Deno.env.get("PROJECT_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+  if (!projectUrl) {
+    return jsonResponse(
+      {
+        error: "Server misconfigured: missing required env var PROJECT_URL.",
+      },
+      500
+    );
+  }
+  if (!serviceRoleKey) {
+    return jsonResponse(
+      {
+        error: "Server misconfigured: missing required env var SERVICE_ROLE_KEY.",
+      },
+      500
+    );
   }
 
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
 
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  const supabase = createClient(projectUrl, serviceRoleKey, {
     global: { headers: { Authorization: authHeader } },
     auth: { persistSession: false },
   });
@@ -169,18 +182,17 @@ serve(async (req) => {
   );
 
   if (!forceRegenerate) {
-    // Cache hit path must return persisted message rows (not raw strings),
-    // otherwise the frontend cannot render/send them reliably.
+    // Cache hit path: return full persisted message objects
     const { data: existingMessages, error: existingMessagesError } = await supabase
       .from("messages")
-      .select("id, workspace_id, lead_id, campaign_id, content, status, is_automated, variation_index, prompt_hash, metadata, created_at, updated_at")
+      .select("id, lead_id, campaign_id, content, status, variation_index, created_at, workspace_id, is_automated, prompt_hash, metadata")
       .eq("lead_id", leadId)
       .eq("campaign_id", campaignId)
       .eq("prompt_hash", promptHash)
-      .order("variation_index", { ascending: true })
-      .limit(variationsCount);
+      .order("variation_index", { ascending: true });
 
-    if (!existingMessagesError && Array.isArray(existingMessages) && existingMessages.length >= 2) {
+    if (!existingMessagesError && Array.isArray(existingMessages) && existingMessages.length >= Math.min(2, variationsCount)) {
+      // Ensure we have at least the requested amount or a reasonable minimum
       return jsonResponse({ messages: existingMessages.slice(0, variationsCount) }, 200);
     }
   }
@@ -282,6 +294,8 @@ FORMATO OBRIGATÓRIO:
   }
 
   const responsePayload = JSON.stringify({ messages: finalMessages });
+  
+  // 1. Audit Log
   await supabase.from("ai_generations").insert({
     workspace_id: lead.workspace_id,
     lead_id: lead.id,
@@ -296,6 +310,7 @@ FORMATO OBRIGATÓRIO:
     latency_ms: latencyMs,
   });
 
+  // 2. Persist individual messages and return full objects
   const { data: savedMessages, error: insertMessagesError } = await supabase
     .from("messages")
     .insert(
@@ -305,19 +320,19 @@ FORMATO OBRIGATÓRIO:
         campaign_id: campaign.id,
         content: m,
         is_automated: false,
-        status: "success",
+        status: "generated",
         variation_index: idx,
         prompt_hash: promptHash,
-        metadata: { 
-          ai_model: modelUsed, 
+        metadata: {
+          ai_model: modelUsed,
           latency: latencyMs,
           style: idx === 0 ? 'direto' : idx === 1 ? 'consultivo' : 'criativo'
         }
       }))
     )
-    .select();
+    .select("id, lead_id, campaign_id, content, status, variation_index, created_at, workspace_id, is_automated, prompt_hash, metadata");
 
-  if (insertMessagesError) {
+  if (insertMessagesError || !savedMessages) {
     return jsonResponse({ error: "Failed to persist generated messages.", messages: [] }, 500);
   }
 

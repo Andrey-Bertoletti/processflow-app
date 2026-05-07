@@ -14,10 +14,12 @@
     "supabase:start": "npm run db:sync && cd backend && supabase start",
     "supabase:stop": "cd backend && supabase stop",
     "test:scale": "node scripts/load-test/simulate-scale.mjs full-suite",
+    "zip:submission": "node scripts/create-submission-zip.mjs",
     "ops": "echo 'Dashboard em: http://localhost:3000/admin/system-health'"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.3"
+    "@supabase/supabase-js": "^2.105.3",
+    "archiver": "^6.0.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",

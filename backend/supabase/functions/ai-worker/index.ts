@@ -74,13 +74,16 @@ serve(async (req) => {
     }
   }
 
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return jsonResponse({ error: "Server misconfigured: missing Supabase env vars." }, 500);
+  const projectUrl = Deno.env.get("PROJECT_URL") ?? "";
+  const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
+  if (!projectUrl) {
+    return jsonResponse({ error: "Server misconfigured: missing required env var PROJECT_URL." }, 500);
+  }
+  if (!serviceRoleKey) {
+    return jsonResponse({ error: "Server misconfigured: missing required env var SERVICE_ROLE_KEY." }, 500);
   }
 
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+  const supabaseAdmin = createClient(projectUrl, serviceRoleKey, {
     auth: { persistSession: false },
   });
 
@@ -301,7 +304,7 @@ FORMATO OBRIGATÓRIO:
           .from("messages")
           .update({
             content: finalMessages[0],
-            status: "success",
+            status: "generated",
             is_automated: true,
             variation_index: 0,
             prompt_hash: promptHash,
@@ -324,7 +327,7 @@ FORMATO OBRIGATÓRIO:
           campaign_id: campaignId,
           content: finalMessages[0],
           is_automated: true,
-          status: "success",
+          status: "generated",
           variation_index: 0,
           prompt_hash: promptHash,
           metadata: {
@@ -349,7 +352,7 @@ FORMATO OBRIGATÓRIO:
           campaign_id: campaignId,
           content: message,
           is_automated: true,
-          status: "success",
+          status: "generated",
           variation_index: idx + 1,
           prompt_hash: promptHash,
           metadata: {

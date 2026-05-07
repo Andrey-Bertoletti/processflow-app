@@ -34,9 +34,19 @@ serve(async (req) => {
 
     const jobTrigger = payload.record;
 
+    const projectUrl = Deno.env.get('PROJECT_URL') ?? '';
+    const serviceRoleKey = Deno.env.get('SERVICE_ROLE_KEY') ?? '';
+
+    if (!projectUrl) {
+      return new Response(JSON.stringify({ error: "Server misconfigured: missing required env var PROJECT_URL." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (!serviceRoleKey) {
+      return new Response(JSON.stringify({ error: "Server misconfigured: missing required env var SERVICE_ROLE_KEY." }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      projectUrl,
+      serviceRoleKey
     );
 
     const traceUUID = crypto.randomUUID();
