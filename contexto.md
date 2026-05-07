@@ -5,12 +5,6 @@ Este documento é a "fonte da verdade" técnica para o projeto ProcessFlow. Ele 
 ## 🌳 Mapeamento de Estrutura (Tree)
 ```text
 .
-├── supabase/                # Core de Infraestrutura e Banco (Fonte da Verdade)
-│   ├── migrations/          # 49 Migrações SQL (Esquema, RLS, Triggers, RPCs)
-│   ├── functions/           # Edge Functions (IA, Workers, Análise Semântica)
-│   ├── config.toml          # Configuração CLI do Supabase
-│   ├── schema.sql           # Snaphot do esquema atual
-│   └── seed.sql             # Dados iniciais de desenvolvimento
 ├── frontend/                # Aplicação Principal (UI/UX)
 │   ├── src/
 │   │   ├── app/             # Rotas e Layouts (Next.js App Router)
@@ -19,8 +13,17 @@ Este documento é a "fonte da verdade" técnica para o projeto ProcessFlow. Ele 
 │   │   └── hooks/           # Lógica de estado e hooks customizados
 │   ├── tests/               # Testes E2E (Playwright) e Unitários (Vitest)
 │   └── public/              # Ativos estáticos e Assets
+├── backend/                 # Backend Serverless (Supabase Edge Functions)
+│   └── supabase/
+│       ├── functions/       # Edge Functions (IA, Workers, Análise Semântica)
+│       ├── config.toml      # Configuração do Supabase CLI
+│       └── migrations/      # Mirror gerado via sync (NÃO editar direto)
+├── database/                # Fonte da verdade do Banco (PostgreSQL/Supabase)
+│   ├── migrations/          # Source of truth das migrations SQL
+│   ├── schema.sql           # Snapshot opcional do schema (gerável)
+│   └── seed.sql             # Seed opcional para dev/teste
 ├── scripts/                 # Automações de DevOps e Entrega Segura
-├── .env                     # Variáveis de ambiente (PROJECT_URL, SERVICE_ROLE_KEY)
+├── .env.example             # Blueprint seguro de variáveis (SEM valores reais)
 └── contexto.md              # Este arquivo (Memória Técnica)
 ```
 
@@ -35,10 +38,16 @@ Este documento é a "fonte da verdade" técnica para o projeto ProcessFlow. Ele 
     *   `sonner` (Sistema de notificações).
 
 ## ⚙️ Fluxo do Backend (Supabase-Centric)
-*   **Migrations**: Localizadas em `./supabase/migrations`. São a única fonte de verdade para o esquema do banco.
+*   **Migrations (Fonte da Verdade)**: Localizadas em `./database/migrations`.
+    * O Supabase CLI aplica migrations a partir de `backend/supabase/migrations`, que é um **mirror gerado** por `npm run db:sync`.
 *   **Conexão**: O frontend se comunica via PostgREST (API automática do Supabase) respeitando RLS.
 *   **Lógica Assíncrona**: O banco de dados alimenta uma tabela `job_queue`. O Worker (`projection-worker` ou similar) processa essa fila e dispara as Edge Functions.
 *   **Endpoints de IA**: As Edge Functions (`generate-message`, `semantic-analysis`) são chamadas via `supabase.functions.invoke()`.
+
+## 🔐 Configuração de Secrets (Nunca comitar)
+- Não existe `.env` real versionado no repositório.
+- Para desenvolvimento local com Supabase CLI (rodando a partir de `backend/`), use `backend/.env` (ignorado pelo Git) como fonte de variáveis.
+- Para produção, configure secrets no Supabase (Edge Functions) e no provedor de deploy do frontend (ex: Vercel) sem expor chaves no browser.
 
 ## 🎨 Resumo de Componentes (Frontend)
 ### Shared (Reutilizáveis)

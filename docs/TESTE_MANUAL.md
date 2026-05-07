@@ -22,7 +22,7 @@ Este guia fornece o passo-a-passo para validar as funcionalidades exigidas no ed
 - **Esperado:** funil de 7 etapas criado automaticamente e redirecionamento para o Dashboard.
 
 ### 2. Configuração de Campos Personalizados
-- **Ação:** Ir na área de Campos Customizados.
+- **Ação:** Ir no painel Admin do workspace em `/admin` e abrir **Campos & Regras** (ou direto em `/admin/settings/fields`).
 - **Ação:** Criar campo "Segmento" (Tipo: Texto, Obrigatório: Sim).
 - **Ação:** Criar campo "Faturamento Anual" (Tipo: Número).
 - **Esperado:** campos aparecem na lista de gerenciamento e no formulário/detalhe do lead.
@@ -105,4 +105,3 @@ Este guia fornece o passo-a-passo para validar as funcionalidades exigidas no ed
 
 **Documento:** Homologação de Edital ProcessFlow  
 **Autor:** QA Engineering Team
-

@@ -30,6 +30,17 @@ function sanitizeForPrompt(input: unknown, max = 200) {
   return String(input).replace(/\s+/g, " ").trim().slice(0, max);
 }
 
+function stringifyJsonValue(value: unknown) {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
 async function sha256Hex(input: string) {
   const encoder = new TextEncoder();
   const data = encoder.encode(input);
@@ -129,15 +140,17 @@ serve(async (req) => {
     for (const row of valueRows) {
       const definition = row?.workspace_custom_fields;
       const value = row?.value;
-      if (value === undefined || value === null || String(value).trim() === "") continue;
+      const valueText = stringifyJsonValue(value);
+      if (valueText.trim() === "") continue;
       const label = typeof definition?.name === "string" ? definition.name : row?.custom_field_id;
       const fieldType = typeof definition?.field_type === "string" ? definition.field_type : "custom";
-      customLines.push(`- ${sanitizeForPrompt(label, 60)} (${sanitizeForPrompt(fieldType, 20)}): ${sanitizeForPrompt(value, 200)}`);
+      customLines.push(`- ${sanitizeForPrompt(label, 60)} (${sanitizeForPrompt(fieldType, 20)}): ${sanitizeForPrompt(valueText, 200)}`);
     }
   } else if (metadata && typeof metadata === "object") {
     for (const [key, value] of Object.entries(metadata as Record<string, unknown>)) {
-      if (value === undefined || value === null || String(value).trim() === "") continue;
-      customLines.push(`- ${sanitizeForPrompt(key, 60)}: ${sanitizeForPrompt(value, 200)}`);
+      const valueText = stringifyJsonValue(value);
+      if (valueText.trim() === "") continue;
+      customLines.push(`- ${sanitizeForPrompt(key, 60)}: ${sanitizeForPrompt(valueText, 200)}`);
     }
   }
 
@@ -156,24 +169,19 @@ serve(async (req) => {
   );
 
   if (!forceRegenerate) {
-    const { data: cached } = await supabase
-      .from("ai_generations")
-      .select("response")
+    // Cache hit path must return persisted message rows (not raw strings),
+    // otherwise the frontend cannot render/send them reliably.
+    const { data: existingMessages, error: existingMessagesError } = await supabase
+      .from("messages")
+      .select("id, workspace_id, lead_id, campaign_id, content, status, is_automated, variation_index, prompt_hash, metadata, created_at, updated_at")
+      .eq("lead_id", leadId)
+      .eq("campaign_id", campaignId)
       .eq("prompt_hash", promptHash)
-      .eq("status", "success")
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order("variation_index", { ascending: true })
+      .limit(variationsCount);
 
-    if (cached?.response) {
-      try {
-        const parsed = JSON.parse(cached.response);
-        const cachedMessages = Array.isArray(parsed?.messages) ? parsed.messages.filter((m: any) => typeof m === "string") : [];
-        const sliced = cachedMessages.slice(0, variationsCount);
-        if (sliced.length >= 2) return jsonResponse({ messages: sliced }, 200);
-      } catch {
-        // ignore cache parse errors
-      }
+    if (!existingMessagesError && Array.isArray(existingMessages) && existingMessages.length >= 2) {
+      return jsonResponse({ messages: existingMessages.slice(0, variationsCount) }, 200);
     }
   }
 

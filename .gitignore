@@ -156,3 +156,8 @@ dist
 
 AGENTS.md
 CLAUDE.md
+
+
+# Supabase CLI local state
+backend/supabase/.temp/
+frontend/supabase/.temp/
