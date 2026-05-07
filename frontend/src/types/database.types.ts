@@ -8,6 +8,7 @@ export type Json =
 
 export type WorkspaceCustomField = Database['public']['Tables']['workspace_custom_fields']['Row']
 export type LeadCustomFieldValue = Database['public']['Tables']['lead_custom_field_values']['Row']
+export type WorkspaceRole = "admin" | "member";
 
 export interface Database {
   public: {
@@ -117,6 +118,10 @@ export interface Database {
           phone?: string | null
           assigned_to?: string | null
           metadata?: Json
+          company?: string | null
+          role?: string | null
+          source?: string | null
+          notes?: string | null
           created_at?: string
           updated_at?: string
           deleted_at?: string | null
@@ -131,6 +136,10 @@ export interface Database {
           phone?: string | null
           assigned_to?: string | null
           metadata?: Json
+          company?: string | null
+          role?: string | null
+          source?: string | null
+          notes?: string | null
           created_at?: string
           updated_at?: string
           deleted_at?: string | null
@@ -177,6 +186,7 @@ export interface Database {
       lead_custom_field_values: {
         Row: {
           id: string
+          workspace_id: string
           lead_id: string
           custom_field_id: string
           value: Json
@@ -185,6 +195,7 @@ export interface Database {
         }
         Insert: {
           id?: string
+          workspace_id: string
           lead_id: string
           custom_field_id: string
           value?: Json
@@ -193,6 +204,7 @@ export interface Database {
         }
         Update: {
           id?: string
+          workspace_id?: string
           lead_id?: string
           custom_field_id?: string
           value?: Json
@@ -311,6 +323,10 @@ export interface Database {
         Args: Record<string, never>
         Returns: Json
       }
+      get_user_workspaces: {
+        Args: Record<string, never>
+        Returns: Database["public"]["Tables"]["workspaces"]["Row"][]
+      }
       create_workspace_with_owner: {
         Args: { p_name: string }
         Returns: string
@@ -325,6 +341,10 @@ export interface Database {
       }
       is_user_in_workspace: {
         Args: { ws_id: string }
+        Returns: boolean
+      }
+      is_workspace_admin: {
+        Args: { p_workspace_id: string }
         Returns: boolean
       }
       get_workspace_members: {
@@ -359,10 +379,10 @@ export type Message = Database['public']['Tables']['messages']['Row']
 
 export type WorkspaceMember = {
   id: string
-  user_id: string
-  display_name: string
+  userId: string
+  displayName: string
   email: string
-  role: string
+  role: WorkspaceRole
 }
 
 export type LeadFormPayload = {
@@ -372,6 +392,7 @@ export type LeadFormPayload = {
   company?: string | null
   role?: string | null
   source?: string | null
+  notes?: string | null
   stageId: string
   assignedTo?: string | null
   campaignId?: string | null

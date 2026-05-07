@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { LeadFormPayload, Stage, WorkspaceMember, WorkspaceCustomField } from "@/types/database.types";
-import { FIELD_LABELS } from "@/lib/pipeline";
+import type { Json, LeadFormPayload, Stage, WorkspaceMember, WorkspaceCustomField } from "@/types/database.types";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
-import { SelectField, TextField } from "@/components/ui/Field";
+import { SelectField, TextField, TextareaField } from "@/components/ui/Field";
 import LeadCustomFieldInputs from "@/components/custom-fields/LeadCustomFieldInputs";
-import { buildLeadCustomFieldValuesDraft, getRequiredRuleLabel, normalizeRequiredFieldRules, type LeadWithCustomFieldValues } from "@/lib/custom-fields";
+import { buildLeadCustomFieldValuesDraft, normalizeRequiredFieldRules, type LeadWithCustomFieldValues } from "@/lib/custom-fields";
 
 type StageValidationModalProps = {
   isOpen: boolean;
@@ -30,15 +29,25 @@ export default function StageValidationModal({
   onClose,
   onConfirm,
 }: StageValidationModalProps) {
+  const [name, setName] = useState(lead.name || "");
   const [email, setEmail] = useState(lead.email || "");
   const [phone, setPhone] = useState(lead.phone || "");
+  const [company, setCompany] = useState(lead.company || "");
+  const [role, setRole] = useState(lead.role || "");
+  const [source, setSource] = useState(lead.source || "");
+  const [notes, setNotes] = useState(lead.notes || "");
   const [assignedTo, setAssignedTo] = useState(lead.assigned_to || "");
-  const [customFieldValues, setCustomFieldValues] = useState<Record<string, unknown>>({});
+  const [customFieldValues, setCustomFieldValues] = useState<Record<string, Json | null>>({});
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
+    setName(lead.name || "");
     setEmail(lead.email || "");
     setPhone(lead.phone || "");
+    setCompany(lead.company || "");
+    setRole(lead.role || "");
+    setSource(lead.source || "");
+    setNotes(lead.notes || "");
     setAssignedTo(lead.assigned_to || "");
     setCustomFieldValues(buildLeadCustomFieldValuesDraft(lead, customFields));
   }, [lead, customFields]);
@@ -81,9 +90,13 @@ export default function StageValidationModal({
       const normalizedPhone = phone.replace(/\D/g, "");
 
       await onConfirm({
-        name: lead.name,
-        email: email || null,
+        name: name.trim() || lead.name,
+        email: email.trim() || null,
         phone: normalizedPhone || null,
+        company: company.trim() || null,
+        role: role.trim() || null,
+        source: source.trim() || null,
+        notes: notes.trim() || null,
         stageId: targetStage.id,
         assignedTo: assignedTo || null,
         campaignId: lead.campaign_id || null,
@@ -118,6 +131,16 @@ export default function StageValidationModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {hasRule("name") && (
+            <TextField
+              label="Nome"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Nome do lead"
+              required
+              autoFocus={true}
+            />
+          )}
           {hasRule("email") && (
             <TextField
               label="E-mail"
@@ -126,7 +149,7 @@ export default function StageValidationModal({
               onChange={(e) => setEmail(e.target.value.trim().toLowerCase())}
               placeholder="exemplo@email.com"
               required
-              autoFocus={true}
+              autoFocus={!hasRule("name")}
             />
           )}
 
@@ -137,7 +160,7 @@ export default function StageValidationModal({
               onChange={(e) => setPhone(e.target.value)}
               placeholder="(11) 99999-0000"
               required
-              autoFocus={!hasRule("email")}
+              autoFocus={!hasRule("name") && !hasRule("email")}
             />
           )}
 
@@ -147,7 +170,7 @@ export default function StageValidationModal({
               value={assignedTo}
               onChange={(e) => setAssignedTo(e.target.value)}
               required
-              autoFocus={!hasRule("email") && !hasRule("phone")}
+              autoFocus={!hasRule("name") && !hasRule("email") && !hasRule("phone")}
             >
 
               <option value="">Selecione um membro</option>
@@ -157,6 +180,47 @@ export default function StageValidationModal({
                 </option>
               ))}
             </SelectField>
+          )}
+
+          {hasRule("company") && (
+            <TextField
+              label="Empresa"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              placeholder="Nome da empresa"
+              required
+            />
+          )}
+
+          {hasRule("role") && (
+            <TextField
+              label="Cargo"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              placeholder="Ex: CEO"
+              required
+            />
+          )}
+
+          {hasRule("source") && (
+            <TextField
+              label="Origem"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              placeholder="Ex: LinkedIn, Indicação..."
+              required
+            />
+          )}
+
+          {hasRule("notes") && (
+            <TextareaField
+              label="Observações"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Notas sobre o lead..."
+              rows={3}
+              required
+            />
           )}
 
           {requiredCustomFields.length > 0 && (

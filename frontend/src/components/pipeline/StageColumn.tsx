@@ -4,7 +4,6 @@ import { useState } from "react";
 import type { Lead, StageWithLeads } from "@/lib/pipeline";
 import LeadCard from "@/components/pipeline/LeadCard";
 import Surface from "@/components/ui/Surface";
-import { Users } from "lucide-react";
 
 type StageColumnProps = {
   stage: StageWithLeads;
@@ -46,7 +45,7 @@ export default function StageColumn({
       data-stage-id={stage.id}
       className={`flex h-full min-h-[520px] w-[300px] shrink-0 flex-col transition-all duration-200
         ${isDragOver
-          ? "border-blue-400/60 bg-blue-500/5 shadow-[0_0_30px_rgba(59,130,246,0.12)]"
+          ? "ring-1 ring-blue-500/40 bg-blue-500/[0.03]"
           : ""
         }
       `}
@@ -54,20 +53,19 @@ export default function StageColumn({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <header className="border-b border-slate-700/70 px-4 py-3">
+      <header className="border-b border-zinc-800/80 px-4 py-3.5">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">{stage.name}</h3>
-          <span className="flex items-center gap-1.5 rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-300 ring-1 ring-slate-700/50">
-            <Users className="h-3 w-3 opacity-60" />
+          <h3 className="text-sm font-medium text-white">{stage.name}</h3>
+          <span className="flex items-center gap-1 rounded-md bg-zinc-800/80 px-2 py-0.5 text-xs font-medium text-zinc-400">
             {stage.leads.length}
           </span>
         </div>
 
-        {/* Barra de progresso sutil */}
+        {/* Progress bar */}
         {stage.leads.length > 0 && (
-          <div className="mt-2 h-0.5 w-full rounded-full bg-slate-800">
+          <div className="mt-2.5 h-[2px] w-full rounded-full bg-zinc-800/60">
             <div
-              className="h-0.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all duration-500"
+              className="h-[2px] rounded-full bg-blue-500/60 transition-all duration-500"
               style={{ width: `${Math.min((stage.leads.length / 10) * 100, 100)}%` }}
             />
           </div>
@@ -75,18 +73,18 @@ export default function StageColumn({
       </header>
 
       <div
-        className={`flex-1 space-y-2.5 overflow-y-auto p-3 transition-all duration-200 ${
+        className={`flex-1 space-y-2 overflow-y-auto p-3 transition-all duration-200 ${
           isDragOver ? "space-y-3" : ""
         }`}
       >
         {isDragOver && (
-          <div className="rounded-lg border-2 border-dashed border-blue-400/50 bg-blue-500/5 py-4 text-center text-xs text-blue-300 animate-pulse">
+          <div className="rounded-xl border border-dashed border-blue-500/30 bg-blue-500/[0.03] py-4 text-center text-xs text-blue-400/70">
             Soltar aqui
           </div>
         )}
 
         {stage.leads.length === 0 && !isDragOver ? (
-          <div className="rounded-lg border border-dashed border-slate-700 px-3 py-8 text-center text-xs text-slate-500">
+          <div className="rounded-xl px-3 py-10 text-center text-xs text-zinc-600">
             Sem leads nesta etapa
           </div>
         ) : (

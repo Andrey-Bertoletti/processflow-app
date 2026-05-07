@@ -59,6 +59,10 @@ export const FIELD_LABELS: Record<string, string> = {
   email: "E-mail",
   phone: "Telefone",
   assigned_to: "Responsável",
+  company: "Empresa",
+  role: "Cargo",
+  source: "Origem",
+  notes: "Observações",
 };
 
 /**

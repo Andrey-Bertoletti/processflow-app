@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Lead, LeadFormPayload, Stage, WorkspaceMember, WorkspaceCustomField } from "@/types/database.types";
+import type { Json, LeadFormPayload, Stage, WorkspaceCustomField, WorkspaceMember } from "@/types/database.types";
 import { useAuth } from "@/app/context/AuthContext";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
@@ -19,15 +19,27 @@ type LeadDetailsDrawerProps = {
   stages: Stage[];
   members: WorkspaceMember[];
   campaigns: any[];
-  customFields: any[];
-  customFieldValues?: any[]; // Adicionado: valores relacionais
+  customFields: WorkspaceCustomField[];
   onClose: () => void;
   onSave: (payload: LeadFormPayload) => Promise<void>;
   onDelete: () => Promise<void>;
-  onMoveToStage: (stageId: string) => Promise<void>;
 };
 
-function buildInitialForm(lead: Lead | null, customFieldValues: any[] = []) {
+type LeadDetailsFormState = {
+  name: string;
+  email: string;
+  phone: string;
+  stageId: string;
+  assignedTo: string;
+  company: string;
+  role: string;
+  source: string;
+  notes: string;
+  campaignId: string;
+  customFieldValues: Record<string, Json | null>;
+};
+
+function buildInitialForm(lead: LeadWithCustomFieldValues | null, customFields: WorkspaceCustomField[]): LeadDetailsFormState {
   return {
     name: lead?.name ?? "",
     email: lead?.email ?? "",
@@ -39,17 +51,8 @@ function buildInitialForm(lead: Lead | null, customFieldValues: any[] = []) {
     source: lead?.source ?? "",
     notes: lead?.notes ?? "",
     campaignId: lead?.campaign_id ?? "",
-    metadata: (lead?.metadata as Record<string, any>) ?? {},
-    customValues: buildCustomValuesMap(customFieldValues || []), // Mapeia id_campo -> valor
+    customFieldValues: buildLeadCustomFieldValuesDraft(lead, customFields),
   };
-}
-
-function buildCustomValuesMap(values: any[]) {
-  const map: Record<string, string> = {};
-  values.forEach(v => {
-    map[v.custom_field_id] = v.value || "";
-  });
-  return map;
 }
 
 export default function LeadDetailsDrawer({
@@ -61,13 +64,11 @@ export default function LeadDetailsDrawer({
   members,
   campaigns,
   customFields,
-  customFieldValues,
   onClose,
   onSave,
   onDelete,
-  onMoveToStage,
 }: LeadDetailsDrawerProps) {
-  const [form, setForm] = useState(() => buildInitialForm(lead, customFieldValues));
+  const [form, setForm] = useState(() => buildInitialForm(lead, customFields));
   const [localMessages, setLocalMessages] = useState<any[]>([]);
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
@@ -78,8 +79,8 @@ export default function LeadDetailsDrawer({
       return;
     }
 
-    setForm(buildInitialForm(lead, customFieldValues));
-  }, [lead, isOpen, customFieldValues]);
+    setForm(buildInitialForm(lead, customFields));
+  }, [lead, isOpen, customFields]);
 
   if (!isOpen || !lead) {
     return null;
@@ -99,9 +100,8 @@ export default function LeadDetailsDrawer({
       stageId: form.stageId,
       assignedTo: form.assignedTo || null,
       campaignId: form.campaignId || null,
-      metadata: form.metadata,
-      customValues: form.customValues, // Novo: Enviado para o handler de salvamento
-    } as LeadFormPayload);
+      customFieldValues: form.customFieldValues,
+    });
   };
 
   const handleGenerateMessages = async (forceRegenerate = false) => {
@@ -221,23 +221,16 @@ export default function LeadDetailsDrawer({
             placeholder="Ex: LinkedIn, Indicação..."
           />
 
-          {customFields.map((field) => (
-            <TextField
-              key={field.id}
-              label={field.label || field.name}
-              type={field.field_type === 'number' ? 'number' : 'text'}
-              value={form.customValues[field.id] || ""}
-              onChange={(event) => setForm((current) => ({
+          <LeadCustomFieldInputs
+            fields={customFields}
+            values={form.customFieldValues}
+            onChange={(fieldId, value) =>
+              setForm((current) => ({
                 ...current,
-                customValues: {
-                  ...current.customValues,
-                  [field.id]: event.target.value
-                }
-              }))}
-              placeholder={`Preencha ${ (field.label || field.name).toLowerCase() }...`}
-              required={field.is_required}
-            />
-          ))}
+                customFieldValues: { ...current.customFieldValues, [fieldId]: value },
+              }))
+            }
+          />
 
           <div className="space-y-1.5">
             <label className="text-xs font-bold uppercase tracking-wider text-slate-500">Observações</label>

@@ -47,8 +47,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(user);
       
       if (user) {
-        // Carregar workspaces permitidos (Owner + Member)
-        const { data: wsData } = await (supabase.rpc as any)("get_user_workspaces");
+        // Carregar workspaces permitidos (Admin + Member)
+        const { data: wsData } = await supabase.rpc("get_user_workspaces");
         setWorkspaces(wsData || []);
 
         // Se o activeWorkspaceId não estiver na lista (ou não existir), pega o primeiro

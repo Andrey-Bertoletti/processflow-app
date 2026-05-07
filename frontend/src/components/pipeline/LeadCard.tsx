@@ -1,6 +1,5 @@
 import type { Lead } from "@/lib/pipeline";
-import Surface from "@/components/ui/Surface";
-import { Bot, UserRound, Mail, Phone } from "lucide-react";
+import { Bot, Mail, Phone, UserRound } from "lucide-react";
 
 type LeadCardProps = {
   lead: Lead;
@@ -17,11 +16,12 @@ export default function LeadCard({ lead, isDragging = false, onClick }: LeadCard
     .toUpperCase();
 
   return (
-    <Surface
-      className={`group cursor-grab select-none p-3 transition-all duration-200
-        hover:border-blue-400/40 hover:-translate-y-0.5 hover:shadow-xl
+    <div
+      className={`group cursor-grab select-none rounded-xl bg-zinc-900/60 p-3.5
+        transition-all duration-200
+        hover:bg-zinc-800/70 hover:-translate-y-0.5
         active:cursor-grabbing active:scale-[0.98] active:opacity-80
-        ${isDragging ? "rotate-1 shadow-2xl opacity-80 scale-105 cursor-grabbing" : ""}
+        ${isDragging ? "rotate-1 scale-105 opacity-70 shadow-xl" : ""}
       `}
       onClick={() => onClick?.(lead.id)}
       role={onClick ? "button" : undefined}
@@ -34,15 +34,15 @@ export default function LeadCard({ lead, isDragging = false, onClick }: LeadCard
         }
       }}
     >
-      {/* Header: Avatar + Nome */}
+      {/* Header: Avatar + Name */}
       <div className="flex items-start gap-2.5">
-        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/30 to-indigo-600/30 text-[10px] font-bold text-blue-200 ring-1 ring-blue-500/20">
+        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-zinc-800 text-[10px] font-medium text-zinc-400">
           {initials}
         </div>
         <div className="min-w-0 flex-1">
-          <h4 className="truncate text-sm font-semibold text-white leading-tight">{lead.name}</h4>
+          <h4 className="truncate text-sm font-medium leading-tight text-white">{lead.name}</h4>
           {lead.email && (
-            <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-slate-400">
+            <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-zinc-500">
               <Mail className="h-2.5 w-2.5 shrink-0" />
               {lead.email}
             </p>
@@ -50,38 +50,34 @@ export default function LeadCard({ lead, isDragging = false, onClick }: LeadCard
         </div>
       </div>
 
-      {/* Footer: Badges & Insights */}
-      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-slate-700/60 pt-2">
-        {/* Intelligence Badge (Phase 10) */}
+      {/* Footer: Badges */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-1.5 border-t border-zinc-800/60 pt-2">
+        {/* Intelligence Badge */}
         {(lead as any).lead_insights?.[0] && (
-          <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ring-1
-            ${(lead as any).lead_insights[0].sentiment === 'hot' ? 'bg-rose-500/20 text-rose-300 ring-rose-500/40' : 
-              (lead as any).lead_insights[0].sentiment === 'warm' ? 'bg-amber-500/20 text-amber-300 ring-amber-500/40' : 
-              'bg-blue-500/20 text-blue-300 ring-blue-500/40'}`}>
-            {(lead as any).lead_insights[0].sentiment === 'hot' ? '🔥' : (lead as any).lead_insights[0].sentiment === 'warm' ? '⚡' : '❄️'}
+          <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-medium
+            ${(lead as any).lead_insights[0].sentiment === 'hot' ? 'bg-red-500/10 text-red-400' : 
+              (lead as any).lead_insights[0].sentiment === 'warm' ? 'bg-amber-500/10 text-amber-400' : 
+              'bg-blue-500/10 text-blue-400'}`}>
             {(lead as any).lead_insights[0].score}%
           </span>
         )}
 
         {lead.phone && (
-          <span className="flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-400 ring-1 ring-slate-700/50">
+          <span className="flex items-center gap-1 rounded-md bg-zinc-800/50 px-1.5 py-0.5 text-[10px] text-zinc-500">
             <Phone className="h-2.5 w-2.5" />
-            {lead.phone}
           </span>
         )}
         {lead.assigned_to && (
-          <span className="flex items-center gap-1 rounded-full bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-400 ring-1 ring-slate-700/50">
+          <span className="flex items-center gap-1 rounded-md bg-zinc-800/50 px-1.5 py-0.5 text-[10px] text-zinc-500">
             <UserRound className="h-2.5 w-2.5" />
-            Atribuído
           </span>
         )}
         {lead.campaign_id && (
-          <span className="ml-auto flex items-center gap-1 rounded-full bg-indigo-950/50 px-2 py-0.5 text-[10px] text-indigo-300 ring-1 ring-indigo-500/20">
+          <span className="ml-auto flex items-center gap-1 rounded-md bg-blue-500/8 px-1.5 py-0.5 text-[10px] text-blue-400/70">
             <Bot className="h-2.5 w-2.5" />
-            IA
           </span>
         )}
       </div>
-    </Surface>
+    </div>
   );
 }

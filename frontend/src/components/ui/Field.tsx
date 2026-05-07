@@ -8,9 +8,9 @@ type BaseProps = {
 
 export function FieldLabel({ label, hint }: { label: string; hint?: string }) {
   return (
-    <div>
+    <div className="mb-2">
       <label className="app-label">{label}</label>
-      {hint ? <p className="mb-2 text-xs text-slate-400">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-zinc-500">{hint}</p> : null}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/app/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, RefreshCw, LayoutDashboard, Zap } from "lucide-react";
+import { Plus, RefreshCw, LayoutDashboard, Zap, Settings } from "lucide-react";
 
 import KanbanBoard from "@/components/pipeline/KanbanBoard";
 import LeadCreateDrawer from "@/components/pipeline/LeadCreateDrawer";
@@ -17,6 +17,7 @@ import { fetchPipelineData, moveLeadToStagePlaceholder, validateLeadMovement, ty
 import type { Lead, LeadFormPayload, Stage, WorkspaceMember } from "@/types/database.types";
 import { fetchWorkspaceMembers } from "@/lib/workspace";
 import StageValidationModal from "@/components/pipeline/StageValidationModal";
+import useWorkspaceAdmin from "@/hooks/useWorkspaceAdmin";
 
 function PipelineSkeleton() {
   return (
@@ -39,6 +40,7 @@ function PipelineSkeleton() {
 
 export default function PipelinePage() {
   const { user, loading, activeWorkspaceId } = useAuth();
+  const { isAdmin } = useWorkspaceAdmin(activeWorkspaceId, Boolean(user));
   const [stages, setStages] = useState<StageWithLeads[]>([]);
   const [members, setMembers] = useState<WorkspaceMember[]>([]);
   const [campaigns, setCampaigns] = useState<any[]>([]);
@@ -138,10 +140,14 @@ export default function PipelinePage() {
 
   const handleInitializePipeline = async () => {
     if (!activeWorkspaceId) return;
+    if (!isAdmin) {
+      toast.error("Apenas administradores podem inicializar/configurar etapas do funil.");
+      return;
+    }
     setIsLoading(true);
     setError(null);
     try {
-      const { error: seedError } = await (supabase.rpc as any)("seed_workspace_pipeline", {
+      const { error: seedError } = await supabase.rpc("seed_workspace_pipeline", {
         p_workspace_id: activeWorkspaceId,
         p_with_demo_leads: true,
       });
@@ -242,21 +248,6 @@ export default function PipelinePage() {
 
     try {
       const createdLead = await createLeadInWorkspace({ workspaceId: activeWorkspaceId, payload });
-      
-      if (payload.customFieldValues && Object.keys(payload.customFieldValues).length > 0) {
-        const valueEntries = Object.entries(payload.customFieldValues).map(([fieldId, value]) => ({
-          lead_id: createdLead.id,
-          custom_field_id: fieldId,
-          value: value,
-          workspace_id: activeWorkspaceId,
-        }));
-
-        const { error: customFieldsError } = await supabase
-          .from("lead_custom_field_values")
-          .insert(valueEntries);
-
-        if (customFieldsError) throw customFieldsError;
-      }
 
       await loadPipeline();
       setIsCreateDrawerOpen(false);
@@ -292,21 +283,6 @@ export default function PipelinePage() {
         payload,
         expectedUpdatedAt: selectedLead.updated_at,
       });
-
-      if (payload.customFieldValues && Object.keys(payload.customFieldValues).length > 0) {
-        const valueEntries = Object.entries(payload.customFieldValues).map(([fieldId, value]) => ({
-          lead_id: updatedLead.id,
-          custom_field_id: fieldId,
-          value: value,
-          workspace_id: activeWorkspaceId,
-        }));
-
-        const { error: customFieldsError } = await supabase
-          .from("lead_custom_field_values")
-          .upsert(valueEntries, { onConflict: 'lead_id, custom_field_id' });
-
-        if (customFieldsError) throw customFieldsError;
-      }
 
       await loadPipeline();
       setSelectedLeadId(updatedLead.id);
@@ -347,7 +323,7 @@ export default function PipelinePage() {
       await deleteLeadInWorkspace({ workspaceId: activeWorkspaceId, leadId: selectedLead.id });
       removeLeadFromState(selectedLead.id);
       setSelectedLeadId(null);
-      toast.success(`Lead excluÃ­do.`);
+      toast.success(`Lead excluído.`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Erro ao excluir lead";
       setError(message);
@@ -431,10 +407,12 @@ export default function PipelinePage() {
               <LayoutDashboard className="h-4 w-4" />
               Dashboard
             </Link>
-            <Link href="/admin/settings/fields" className="app-button app-button-secondary text-sm" title="Campos Customizados">
-              <Settings className="h-4 w-4" />
-              Campos
-            </Link>
+            {isAdmin ? (
+              <Link href="/admin/settings/fields" className="app-button app-button-secondary text-sm" title="Campos Customizados">
+                <Settings className="h-4 w-4" />
+                Campos
+              </Link>
+            ) : null}
             {isSavingMove && (
 
               <span className="app-pill border-amber-500/30 bg-amber-500/10 text-amber-200">
@@ -461,16 +439,17 @@ export default function PipelinePage() {
             </div>
             <h2 className="text-xl font-bold text-white">Funil Vazio</h2>
             <p className="mt-2 text-slate-400">
-              Este workspace ainda nÃ£o possui estÃ¡gios configurados.
+              Este workspace ainda não possui estágios configurados.
             </p>
-            <Button 
-              variant="primary" 
-              className="mt-6" 
-              onClick={handleInitializePipeline}
-              disabled={isLoading}
-            >
-              {isLoading ? "Inicializando..." : "Inicializar Etapas PadrÃ£o"}
-            </Button>
+            {isAdmin ? (
+              <Button variant="primary" className="mt-6" onClick={handleInitializePipeline} disabled={isLoading}>
+                {isLoading ? "Inicializando..." : "Inicializar Etapas Padrão"}
+              </Button>
+            ) : (
+              <Surface className="mt-6 border border-slate-800/60 bg-slate-950/40 p-4 text-sm text-slate-300">
+                Peça para um <span className="font-medium text-white">admin</span> do workspace configurar as etapas do funil.
+              </Surface>
+            )}
           </Surface>
         ) : (
 
@@ -502,11 +481,9 @@ export default function PipelinePage() {
         members={members}
         campaigns={campaigns}
         customFields={customFields}
-        customFieldValues={selectedLead?.lead_custom_field_values}
         onClose={() => setSelectedLeadId(null)}
         onSave={handleUpdateLead}
         onDelete={handleDeleteLead}
-        onMoveToStage={(stageId) => moveLeadOptimistically(selectedLead!.id, stageId)}
         isDeleting={isDeletingLead}
       />
 

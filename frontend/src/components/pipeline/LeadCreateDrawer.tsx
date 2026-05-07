@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import type { LeadFormPayload, Stage, WorkspaceMember, WorkspaceCustomField } from "@/types/database.types";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
-import { SelectField, TextField } from "@/components/ui/Field";
+import { SelectField, TextField, TextareaField } from "@/components/ui/Field";
 import LeadCustomFieldInputs from "@/components/custom-fields/LeadCustomFieldInputs";
 import type { Json } from "@/types/database.types";
 import { buildCustomFieldMetadata } from "@/lib/custom-fields";
+import { X } from "lucide-react";
 
 type LeadCreateDrawerProps = {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export default function LeadCreateDrawer({
   const [company, setCompany] = useState("");
   const [role, setRole] = useState("");
   const [source, setSource] = useState("");
+  const [notes, setNotes] = useState("");
   const [customFieldValues, setCustomFieldValues] = useState<Record<string, Json | null>>({});
 
   useEffect(() => {
@@ -50,6 +52,7 @@ export default function LeadCreateDrawer({
     setCompany("");
     setRole("");
     setSource("");
+    setNotes("");
     setCustomFieldValues(
       customFields.reduce<Record<string, Json | null>>((accumulator, field) => {
         if (field.is_active) {
@@ -69,21 +72,28 @@ export default function LeadCreateDrawer({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-sm">
-      <Surface className="h-full w-full max-w-md rounded-none border-l-0 p-5">
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-white">Novo Lead</h2>
-          <Button
+    <div className="fixed inset-0 z-50 flex justify-end animate-fade-in">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+
+      {/* Drawer */}
+      <Surface
+        elevation="overlay"
+        className="relative z-10 h-full w-full max-w-md rounded-none border-l border-zinc-800/50 p-6 animate-slide-in overflow-y-auto"
+      >
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-lg font-semibold tracking-tight text-white">Novo Lead</h2>
+          <button
             type="button"
-            variant="secondary"
             onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 transition-colors hover:bg-zinc-800 hover:text-white"
           >
-            Fechar
-          </Button>
+            <X className="h-4 w-4" />
+          </button>
         </div>
 
         <form
-          className="space-y-4"
+          className="space-y-5"
           onSubmit={async (event) => {
             event.preventDefault();
             // Normaliza o telefone antes de enviar
@@ -96,6 +106,7 @@ export default function LeadCreateDrawer({
               company: company.trim() || null,
               role: role.trim() || null,
               source: source.trim() || null,
+              notes: notes.trim() || null,
               stageId,
               assignedTo: assignedTo || null,
               campaignId: null,
@@ -105,7 +116,7 @@ export default function LeadCreateDrawer({
 
         >
           <TextField
-            label="Nome do Lead/Processo"
+            label="Nome do Lead"
             placeholder="Ex: Empresa Orion"
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -144,10 +155,18 @@ export default function LeadCreateDrawer({
           </div>
 
           <TextField
-            label="Origem do Lead"
+            label="Origem"
             value={source}
             onChange={(event) => setSource(event.target.value)}
             placeholder="Ex: LinkedIn, Indicação..."
+          />
+
+          <TextareaField
+            label="Observações"
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            placeholder="Notas sobre o lead..."
+            rows={3}
           />
 
           <LeadCustomFieldInputs
@@ -170,11 +189,11 @@ export default function LeadCreateDrawer({
           </SelectField>
 
           <SelectField
-            label="Atribuir Responsavel"
+            label="Responsável"
             value={assignedTo}
             onChange={(event) => setAssignedTo(event.target.value)}
           >
-              <option value="">Sem responsavel</option>
+              <option value="">Sem responsável</option>
               {members.map((member: WorkspaceMember) => (
                 <option key={member.id} value={member.userId}>
                   {member.displayName} {member.role ? `(${member.role})` : ""}
@@ -185,9 +204,11 @@ export default function LeadCreateDrawer({
           <Button
             type="submit"
             disabled={isSaving || !stageId || !name.trim()}
+            isLoading={isSaving}
             className="w-full"
+            size="lg"
           >
-            {isSaving ? "Salvando..." : "Salvar Lead"}
+            {isSaving ? "Salvando..." : "Criar Lead"}
           </Button>
         </form>
       </Surface>

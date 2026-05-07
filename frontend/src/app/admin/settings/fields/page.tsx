@@ -30,7 +30,7 @@ const EMPTY_FIELD_FORM: FieldFormState = {
   optionsText: "",
 };
 
-const BASE_REQUIRED_FIELDS = ["name", "email", "phone", "assigned_to", "company", "role", "source"] as const;
+const BASE_REQUIRED_FIELDS = ["name", "email", "phone", "assigned_to", "company", "role", "source", "notes"] as const;
 
 export default function CustomFieldsSettings() {
   const { activeWorkspaceId } = useAuth();

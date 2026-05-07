@@ -5,13 +5,27 @@ import { buildCustomFieldMetadata, isBlankCustomFieldValue, type LeadWithCustomF
 
 export { normalizePhone, validateLeadPayload };
 
+function normalizeOptionalText(value: string | null | undefined) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  const trimmed = String(value).trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 async function replaceLeadCustomFieldValues(
+  workspaceId: string,
   leadId: string,
   customFieldValues: LeadFormPayload["customFieldValues"],
 ) {
   const values = Object.entries(customFieldValues || {}).filter(([, value]) => !isBlankCustomFieldValue(value));
 
-  const deleteResult = await supabase.from("lead_custom_field_values").delete().eq("lead_id", leadId);
+  const deleteResult = await supabase
+    .from("lead_custom_field_values")
+    .delete()
+    .eq("workspace_id", workspaceId)
+    .eq("lead_id", leadId);
   if (deleteResult.error) {
     throw new Error(deleteResult.error.message);
   }
@@ -22,6 +36,7 @@ async function replaceLeadCustomFieldValues(
 
   const insertResult = await supabase.from("lead_custom_field_values").insert(
     values.map(([customFieldId, value]) => ({
+      workspace_id: workspaceId,
       lead_id: leadId,
       custom_field_id: customFieldId,
       value,
@@ -61,6 +76,10 @@ export async function createLeadInWorkspace(params: {
       name: payload.name.trim(),
       email: payload.email?.trim() || null,
       phone: normalizePhone(payload.phone),
+      company: normalizeOptionalText(payload.company),
+      role: normalizeOptionalText(payload.role),
+      source: normalizeOptionalText(payload.source),
+      notes: normalizeOptionalText(payload.notes),
       stage_id: payload.stageId,
       assigned_to: payload.assignedTo,
       campaign_id: payload.campaignId,
@@ -73,7 +92,7 @@ export async function createLeadInWorkspace(params: {
     throw new Error(error.message);
   }
 
-  await replaceLeadCustomFieldValues(data.id, payload.customFieldValues);
+  await replaceLeadCustomFieldValues(workspaceId, data.id, payload.customFieldValues);
 
   return await fetchLeadWithRelations(data.id);
 }
@@ -93,6 +112,10 @@ export async function updateLeadInWorkspace(params: {
       name: payload.name.trim(),
       email: payload.email?.trim() || null,
       phone: normalizePhone(payload.phone),
+      company: normalizeOptionalText(payload.company),
+      role: normalizeOptionalText(payload.role),
+      source: normalizeOptionalText(payload.source),
+      notes: normalizeOptionalText(payload.notes),
       stage_id: payload.stageId,
       assigned_to: payload.assignedTo,
       campaign_id: payload.campaignId,
@@ -111,7 +134,7 @@ export async function updateLeadInWorkspace(params: {
     throw new Error(error.message);
   }
 
-  await replaceLeadCustomFieldValues(data.id, payload.customFieldValues);
+  await replaceLeadCustomFieldValues(workspaceId, data.id, payload.customFieldValues);
 
   return await fetchLeadWithRelations(data.id);
 }

@@ -22,7 +22,7 @@ export async function POST() {
       .from("workspace_users")
       .select("role")
       .eq("user_id", user.id)
-      .in("role", ["owner", "admin"])
+      .eq("role", "admin")
       .limit(1)
       .maybeSingle();
 
@@ -87,4 +87,3 @@ export async function POST() {
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
   }
 }
-

@@ -273,7 +273,21 @@ export default function SystemHealthPage() {
       setLastRefreshed(new Date());
       setError(null);
     } catch (e: any) {
-      setError(e.message || "Failed to fetch health data");
+      const raw = e?.message || "Failed to fetch health data";
+      const isPermission =
+        /permission denied/i.test(raw) ||
+        /not authorized/i.test(raw) ||
+        String(e?.code || "").toLowerCase() === "42501";
+
+      if (isPermission) {
+        setAutoRefresh(false);
+      }
+
+      setError(
+        isPermission
+          ? "Acesso restrito: este painel é ops-only e o RPC foi bloqueado para usuários autenticados. Use as telas de Admin do Workspace em /admin."
+          : raw,
+      );
     } finally {
       setLoading(false);
     }
