@@ -6,7 +6,7 @@ Mini CRM para equipes de SDR com Kanban por workspace, campanhas, campos persona
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%2B%20Auth%20%2B%20Edge%20Functions-3FCF8E?style=flat-square&logo=supabase&logoColor=111)
 ![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-UI-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
-![OpenAI](https://img.shields.io/badge/OpenAI-API-412991?style=flat-square&logo=openai&logoColor=white)
+![Grok](https://img.shields.io/badge/Grok-llama--3.3--70b--versatile-000000?style=flat-square)
 ![Status](https://img.shields.io/badge/status-pronto%20para%20avalia%C3%A7%C3%A3o-22c55e?style=flat-square)
 
 ---
