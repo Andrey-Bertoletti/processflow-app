@@ -14,7 +14,7 @@ ALTER TABLE public.messages
 ADD COLUMN IF NOT EXISTS is_automated boolean DEFAULT false;
 
 ALTER TABLE public.messages
-ADD COLUMN IF NOT EXISTS status text DEFAULT 'success';
+ADD COLUMN IF NOT EXISTS status text DEFAULT 'generated';
 
 ALTER TABLE public.messages
 ADD COLUMN IF NOT EXISTS metadata jsonb DEFAULT '{}'::jsonb;

@@ -1,107 +1,100 @@
-# 🧪 Roteiro de Teste Manual e QA - ProcessFlow
+# Roteiro de teste manual e QA — ProcessFlow
 
-Este guia fornece o passo-a-passo para validar as funcionalidades exigidas no edital e os principais diferenciais técnicos do **ProcessFlow**.
-
----
-
-## 📋 Pré-requisitos para o Teste
-
-1. **Ambiente:** aplicação publicada ou local.
-2. **Infra (local):** Supabase migrations aplicadas (`npm run supabase:start` ou `npm run banco:reset`).
-3. **Segredos:** `OPENAI_API_KEY` configurada no ambiente do Supabase / Edge Functions.
-4. **Workers:** Edge Functions `ai-worker` e `generate-message` servidas/deployadas.
+Guia para validar a aplicação end-to-end. **Preencha a coluna “Verificado” somente após executar o passo no ambiente real** (local ou produção com Supabase + Edge Functions configurados).
 
 ---
 
-## 🚀 Fluxo Principal de Testes
+## Pré-requisitos
 
-### 1. Autenticação e Onboarding
-- **Ação:** Criar uma conta nova em `/auth/register`.
-- **Esperado:** redirecionamento para criação de Workspace.
-- **Ação:** Criar o primeiro Workspace (ex: "Vendas Alpha").
-- **Esperado:** funil de 7 etapas criado automaticamente e redirecionamento para o Dashboard.
-
-### 2. Configuração de Campos Personalizados
-- **Ação:** Ir no painel Admin do workspace em `/admin` e abrir **Campos & Regras** (ou direto em `/admin/settings/fields`).
-- **Ação:** Criar campo "Segmento" (Tipo: Texto, Obrigatório: Sim).
-- **Ação:** Criar campo "Faturamento Anual" (Tipo: Número).
-- **Esperado:** campos aparecem na lista de gerenciamento e no formulário/detalhe do lead.
-
-### 3. Gestão de Leads e Regras de Transição
-- **Ação:** Criar um lead na etapa **Base** preenchendo apenas os campos padrão.
-- **Ação:** Tentar mover o lead para a etapa **Lead Mapeado**.
-- **Esperado:** sistema bloqueia a movimentação e informa os campos obrigatórios da etapa.
-- **Ação:** Preencher o campo "Segmento" no detalhe do lead e mover novamente.
-- **Esperado:** movimentação realizada com sucesso.
-
-### 4. Inteligência de Vendas (IA - Manual)
-- **Ação:** Criar uma campanha (ex: "Outbound SaaS") com contexto e prompt.
-- **Ação:** No detalhe do lead, selecionar a campanha criada.
-- **Ação:** Clicar em **✨ Ver Sugestões**.
-- **Esperado:** surgem 2–3 variações de mensagens com botões de copiar e enviar.
-- **Ação:** Clicar em **🔄 Regenerar**.
-- **Esperado:** novas mensagens são geradas.
-
-### 5. Envio Simulável e Timeline
-- **Ação:** Escolher uma variação e clicar em **Enviar**.
-- **Esperado:**
-  1. Toast de sucesso.
-  2. Lead move-se automaticamente para **Tentando Contato**.
-  3. Status da mensagem muda para "ENVIADA".
-  4. Na seção **Linha do Tempo**, surge um evento "Mensagem Enviada".
-
-### 6. Automação por Etapa Gatilho (Diferencial)
-
-**Objetivo:** quando uma etapa possui `stages.auto_campaign_id`, o sistema deve:
-1) enfileirar um job em `public.job_queue` ao **criar** um lead direto na etapa gatilho;
-2) enfileirar um job em `public.job_queue` ao **mover** um lead para a etapa gatilho;
-3) criar/atualizar uma mensagem placeholder `pending` para feedback imediato;
-4) o worker `ai-worker` deve gerar as mensagens e marcar como `success` (equivalente a “generated”).
-
-#### 6.1 Vincular campanha à etapa gatilho
-- **Ação:** Editar a campanha (ex: "Outbound SaaS") e selecionar a etapa **Lead Mapeado** como "Etapa Gatilho".
-- **Esperado:** a etapa fica com `auto_campaign_id = <campaign_id>`.
-
-#### 6.2 Criar lead direto na etapa gatilho (AFTER INSERT)
-- **Ação:** Criar um novo lead diretamente na etapa **Lead Mapeado**.
-- **Esperado (banco):**
-  - 1 linha em `public.job_queue` com `type = 'generate_ai_message'` e `status = 'pending'`.
-  - 1 linha em `public.messages` com `status = 'pending'`, `is_automated = true` e `metadata.origin = 'trigger_stage'`.
-
-#### 6.3 Mover lead para etapa gatilho (AFTER UPDATE OF stage_id)
-- **Ação:** Criar outro lead em outra etapa e mover para **Lead Mapeado**.
-- **Esperado:** mesmo comportamento (job + placeholder), **sem duplicar** jobs pendentes para a mesma combinação lead/campanha.
-
-#### 6.4 Executar o worker (manual)
-- **Ação (local):** com o Supabase local rodando (`npm run supabase:start`) e as funções servidas (`npm run back`), executar:
-  - `curl -X POST http://localhost:54321/functions/v1/ai-worker`
-  - se `WEBHOOK_SECRET` estiver configurado, usar também `-H "x-webhook-secret: <WEBHOOK_SECRET>"`
-- **Esperado:**
-  - `public.job_queue.status` muda para `completed`.
-  - a mensagem placeholder `pending` é atualizada para `success` com o conteúdo da primeira variação.
-  - as demais variações são inseridas em `public.messages`.
-
-#### 6.5 Verificações rápidas (SQL)
-- **Job:** `select id, type, status, payload from public.job_queue where type = 'generate_ai_message' order by created_at desc limit 5;`
-- **Mensagens:** `select id, status, is_automated, metadata, content from public.messages where lead_id = '<lead_id>' order by created_at desc;`
-
-### 7. Dashboard e Métricas
-- **Ação:** Acessar o Dashboard.
-- **Esperado:**
-  - cards e métricas refletem as movimentações e jobs.
+1. Frontend com `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY` válidos.
+2. Projeto Supabase com migrations aplicadas e RLS ativo.
+3. Edge Functions `generate-message` e `ai-worker` publicadas; segredos (`OPENAI_API_KEY`, `SERVICE_ROLE_KEY`, etc.) definidos no Supabase.
+4. Opcional: duas contas — uma **admin** de um workspace e outra **member** do mesmo workspace — para validar papéis.
 
 ---
 
-## 🛠️ Checklist Técnico de QA
+## Validação automatizada (CI / agente)
 
-| Item | Validação | Status |
-| :--- | :--- | :--- |
-| **RLS** | Tentar acessar lead de outro workspace via URL/API | 🔒 Bloqueado |
-| **Responsividade** | Abrir Kanban no mobile | 📱 OK |
-| **Performance** | Tempo de resposta da IA < 10s | ⚡ OK |
-| **Integridade** | Deletar lead e verificar cascade (mensagens/eventos) | 🗑️ OK |
+Estes itens **não substituem** o teste manual de UI, mas foram executados no repositório:
+
+| Verificação | Resultado (07/05/2026) | Observação |
+|-------------|------------------------|------------|
+| `cd frontend && npm run build` | OK | Build de produção Next.js concluído sem erros. |
+| `cd frontend && npm run test` (Vitest) | OK — 5 testes | Testes em `src/lib/*.test.ts` usam **mocks** do cliente Supabase; **não** exigem rede nem projeto real. |
+
+Fluxos que dependem de **OpenAI**, **cron/webhook** do worker ou políticas RLS no banco **devem** ser validados manualmente na coluna abaixo.
 
 ---
 
-**Documento:** Homologação de Edital ProcessFlow  
-**Autor:** QA Engineering Team
+## Checklist — botões e fluxos principais
+
+Para cada linha: execute a ação e marque apenas quando o resultado bater com o esperado.
+
+Legenda sugerida na coluna **Verificado**: `OK` | `FALHA` | `N/A`
+
+| # | Tela / contexto | Ação | Resultado esperado | Verificado |
+|---|-----------------|------|-------------------|------------|
+| 1 | Login (`/auth/login`) | Preencher email/senha válidos e **Entrar** | Redireciona para `/auth/dashboard` ou `/auth/workspace/create` se não houver workspace; toast em caso de erro do Supabase. | |
+| 2 | Login | Campos vazios e **Entrar** | Toast pedindo preenchimento; não chama API sem dados. | |
+| 3 | Cadastro (`/auth/register`) | Criar conta | Toast de sucesso; redireciona para login (ou fluxo configurado). | |
+| 4 | Cadastro | Senhas diferentes | Toast de validação; não cria usuário. | |
+| 5 | Qualquer tela autenticada | **Sair** (menu da conta no header) | Sessão encerrada; vai para `/auth/login`; workspace ativo limpo. | |
+| 6 | Header (logado) | **Trocar workspace** (select, se houver mais de um) | Kanban/dashboard/campanhas passam a usar o workspace selecionado. | |
+| 7 | Header | **Member**: item **Admin** no menu | **Não** deve aparecer **Admin** para `member`. | |
+| 8 | Header | **Admin**: **Admin** | Abre `/admin` e sub-rotas permitidas; `member` recebe 403 nas rotas `/admin/*`. | |
+| 9 | Dashboard (`/auth/dashboard`) | **+ Novo Workspace** / criar primeiro | Workspace criado; aparece na lista; vira ativo quando aplicável. | |
+|10 | Dashboard | Clicar em um card de workspace | Workspace selecionado (indicação visual); métricas recarregam se houver RPC. | |
+|11 | Dashboard | Falha ao carregar métricas (RPC erro) | Toast amigável; interface não quebra. | |
+|12 | Criar workspace (`/auth/workspace/create`) | **Criar Workspace** | Redireciona ao dashboard; novo workspace na lista e preferido como ativo. | |
+|13 | Pipeline (`/pipeline`) | Sem workspace selecionado | Mensagem para escolher workspace + link para dashboard. | |
+|14 | Pipeline | **Novo Lead** → salvar | Lead aparece na coluna correta; drawer fecha ou atualiza. | |
+|15 | Pipeline | **Recarregar** | Dados sincronizam com o servidor. | |
+|16 | Pipeline | Busca e filtros (texto, responsável, etapa, campanha) | Lista filtra; **Limpar filtros** zera todos (incl. campanha). | |
+|17 | Pipeline | Arrastar lead entre colunas (válido) | Move e persiste; toast de sucesso. | |
+|18 | Pipeline | Mover sem campos obrigatórios | Modal de validação; preencher e confirmar move o lead. | |
+|19 | Pipeline | Funil vazio + **Inicializar etapas** (só admin) | Seed aplica estágios; **member** vê mensagem para pedir admin. | |
+|20 | Drawer lead | **Fechar** | Drawer fecha sem perder dados não salvos de forma inesperada (comportamento atual). | |
+|21 | Drawer lead | Editar campos + **Salvar alterações** | Dados persistem; toast de sucesso. | |
+|22 | Drawer lead | **Excluir** | Confirmação; lead removido do board. | |
+|23 | Drawer lead | Escolher campanha + **Gerar 3 mensagens** | Três sugestões ou erro amigável (rede/RLS/OpenAI). | |
+|24 | Drawer lead | **Regenerar** | Novas variações ou mensagem de erro clara. | |
+|25 | Drawer lead | **Copiar** em mensagem gerada/enfileirada | Conteúdo no clipboard; toast ou erro amigável se clipboard bloqueado. | |
+|26 | Drawer lead | **Enviar** (simulado) em mensagem `generated` | Sucesso; lead tende a ir para “Tentando Contato”; timeline atualiza. | |
+|27 | Drawer lead | **Enviar** com mensagem `pending` | Botão desabilitado / tooltip explicando espera da automação. | |
+|28 | Campanhas (`/campaigns`) | **Nova campanha** (admin) | Modal/form; salva e lista atualiza. | |
+|29 | Campanhas | **Editar** / **Excluir** (admin) | Persistência correta; **member** só leitura / toast. | |
+|30 | Campanhas | Definir **etapa gatilho** no formulário | Valor salvo; automação dispara ao mover lead (validar com worker/cron reais). | |
+|31 | Campos personalizados (`/admin/settings/fields`) | Só **admin** | Acesso permitido; **member** bloqueado pelo layout admin. | |
+|32 | Campos personalizados | Salvar definições / obrigatoriedade por etapa | Regras refletidas no Kanban (bloqueio de movimento). | |
+|33 | Membros (`/admin/members`) | Adicionar/remover/alterar papel (se existir na UI) | RLS e UI coerentes; **member** não acessa. | |
+|34 | Automação (`/admin/automation`) | Abrir tela | Lista jobs / explicação de dependência cron; **member** não acessa. | |
+|35 | Admin — pipeline / funil | Salvar configuração de etapas (se aplicável) | Alterações persistem. | |
+|36 | Responsividade | Reduzir largura (mobile) | Menu do header acessível; pipeline rolável horizontalmente; drawers usáveis. | |
+
+---
+
+## Roteiro do vídeo (edital)
+
+1. Cadastro em `/auth/register`.
+2. Criar workspace e confirmar **admin**.
+3. Criar lead e abrir detalhe.
+4. Criar campanha com **etapa gatilho**.
+5. Gerar 3 mensagens IA no lead.
+6. **Enviar** mensagem simulada.
+7. Mostrar lead em “Tentando Contato”.
+8. Mostrar diferencial: automação `pending` → `generated`, dashboard por papel, tela `/admin/automation`.
+
+---
+
+## Segurança e regras (checklist rápido)
+
+| Item | Resultado esperado | Verificado |
+|------|-------------------|------------|
+| Isolamento RLS | Não acessar dados de outro `workspace_id` via manipulação de URL/client. | |
+| Transição por campos | Movimento bloqueado quando faltam obrigatórios da etapa destino. | |
+| Timeline | Eventos de movimento/envio aparecem no histórico do lead. | |
+
+---
+
+**Documento:** Plano de testes ProcessFlow  
+**Última atualização:** 07/05/2026

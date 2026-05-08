@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Surface from "@/components/ui/Surface";
 import Button from "@/components/ui/Button";
-import { Settings, Shield, Activity, ArrowRight } from "lucide-react";
+import { Settings, Shield, Activity, ArrowRight, Zap, Building2, Crown } from "lucide-react";
 
 export default function AdminHomePage() {
   return (
@@ -19,14 +19,33 @@ export default function AdminHomePage() {
               </p>
             </div>
             <Link href="/pipeline">
-              <Button variant="secondary" rightIcon={<ArrowRight className="h-4 w-4" />}>
+              <Button variant="secondary" leftIcon={<ArrowRight className="h-4 w-4" />}>
                 Voltar ao funil
               </Button>
             </Link>
           </div>
         </Surface>
 
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <Surface className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10 text-blue-300">
+                <Zap className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">Automação & Worker</h2>
+                <p className="text-xs text-slate-400">Jobs pendentes, processados e falhos.</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <Link href="/admin/automation">
+                <Button variant="secondary" className="w-full">
+                  Abrir
+                </Button>
+              </Link>
+            </div>
+          </Surface>
+
           <Surface className="p-6">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-300">
@@ -40,6 +59,25 @@ export default function AdminHomePage() {
             <div className="mt-4">
               <Link href="/admin/settings/fields">
                 <Button className="w-full">Abrir</Button>
+              </Link>
+            </div>
+          </Surface>
+
+          <Surface className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-purple-500/10 text-purple-300">
+                <Building2 className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">Workspaces</h2>
+                <p className="text-xs text-slate-400">Criar, editar e gerenciar espaços de trabalho.</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <Link href="/admin/workspaces">
+                <Button variant="secondary" className="w-full">
+                  Abrir
+                </Button>
               </Link>
             </div>
           </Surface>
@@ -75,6 +113,25 @@ export default function AdminHomePage() {
             </div>
             <div className="mt-4">
               <Link href="/admin/system-health">
+                <Button variant="secondary" className="w-full">
+                  Abrir
+                </Button>
+              </Link>
+            </div>
+          </Surface>
+
+          <Surface className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-500">
+                <Crown className="h-5 w-5" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-white">Super Admin</h2>
+                <p className="text-xs text-slate-400">Controle global e métricas da plataforma.</p>
+              </div>
+            </div>
+            <div className="mt-4">
+              <Link href="/admin/super">
                 <Button variant="secondary" className="w-full">
                   Abrir
                 </Button>

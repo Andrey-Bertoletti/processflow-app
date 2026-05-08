@@ -2,9 +2,9 @@
 -- 1. JOB OWNERSHIP LIFETIME SAFETY (LEASES)
 -- ==========================================
 ALTER TABLE public.job_queue
-ADD COLUMN locked_at TIMESTAMP WITH TIME ZONE,
-ADD COLUMN locked_by UUID, -- ID do Worker (ou Trace ID)
-ADD COLUMN lock_expires_at TIMESTAMP WITH TIME ZONE;
+ADD COLUMN IF NOT EXISTS locked_at TIMESTAMP WITH TIME ZONE,
+ADD COLUMN IF NOT EXISTS locked_by UUID, -- ID do Worker (ou Trace ID)
+ADD COLUMN IF NOT EXISTS lock_expires_at TIMESTAMP WITH TIME ZONE;
 
 -- Atualizamos a Procedure de Lock Atômico para respeitar a "Locação" (Lease)
 -- Se o Job estiver "processing" mas o lock expirou (ex: Worker crashou), o Job é resgatado

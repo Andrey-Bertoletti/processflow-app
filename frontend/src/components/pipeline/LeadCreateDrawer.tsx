@@ -79,7 +79,7 @@ export default function LeadCreateDrawer({
       {/* Drawer */}
       <Surface
         elevation="overlay"
-        className="relative z-10 h-full w-full max-w-md rounded-none border-l border-zinc-800/50 p-6 animate-slide-in overflow-y-auto"
+        className="relative z-10 h-full w-full sm:max-w-md rounded-none border-l border-white/5 p-6 animate-slide-in overflow-y-auto"
       >
         <div className="mb-6 flex items-center justify-between">
           <h2 className="text-lg font-semibold tracking-tight text-white">Novo Lead</h2>

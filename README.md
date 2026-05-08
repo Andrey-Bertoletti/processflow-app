@@ -10,8 +10,9 @@ O sistema permite que equipes organizem leads em um funil visual Kanban, criem c
 
 ## 📺 Demonstração & Links
 
-- **Aplicação:** [LINK_DA_PUBLICACAO_VERCEL_AQUI] (ex: https://processflow-app-eosin.vercel.app)
-- **Vídeo de Walkthrough:** [LINK_DO_VIDEO_OBRIGATORIO_AQUI] (Máx 10 min)
+- **Aplicação:** https://processflow-app-eosin.vercel.app
+- **Root Directory na Vercel:** `frontend`
+- **Vídeo de Walkthrough:** Pendente — adicionar o link (YouTube/Drive) antes da submissão final.
 
 ## 📎 Edital (Prova)
 
@@ -47,7 +48,7 @@ O projeto adota uma arquitetura descentralizada para garantir performance e segu
 O isolamento entre empresas (Workspaces) é garantido nativamente no banco de dados.
 - Cada tabela possui uma coluna `workspace_id`.
 - Usuários só podem acessar dados onde possuem um vínculo na tabela `workspace_users`.
-- Cada usuário cria seu workspace e é adicionado como `owner` via RPC `create_workspace_with_owner`.
+- Cada usuário cria seu workspace e é adicionado como `admin`. O sistema adota um modelo de permissões binário: `admin` (gestão total) e `member` (operação).
 - **Desafio Resolvido (Recursão em RLS):** Policies que faziam `SELECT` em `workspace_users` causavam loop infinito. A solução foi criar funções `SECURITY DEFINER` (`can_access_workspace()`) que bypassam o RLS internamente para validação segura. Isso impede ataques IDOR.
 
 ### Modelagem de Campos Customizados (EAV Relacional)
@@ -89,8 +90,10 @@ Em vez de usar colunas `JSONB` fixas, o sistema utiliza um modelo relacional fle
 ## 🔒 Painel Administrativo (Workspace)
 
 - **URL (local):** `http://localhost:3000/admin`
-- **Quem acessa:** usuários com papel `owner` ou `admin` no workspace selecionado.
-- **Como virar admin:** ao criar um workspace pela tela `/auth/workspace/create`, o usuário é salvo como `owner` (admin) automaticamente via RPC `create_workspace_with_owner`.
+- **Quem acessa:** Usuários com papel `admin` no workspace selecionado.
+- **Regras de Atribuição:** 
+    - O primeiro usuário de um workspace vira `admin` automaticamente.
+    - Usuários adicionados ou convidados posteriormente vira `member` por padrão.
 
 ---
 
@@ -103,7 +106,7 @@ Em vez de usar colunas `JSONB` fixas, o sistema utiliza um modelo relacional fle
 
 ### 1) Clonar o Repositório
 ```bash
-git clone <URL_DO_REPO>
+git clone https://github.com/Andrey-Bertoletti/processflow-app.git
 cd processflow-app
 ```
 
@@ -117,19 +120,24 @@ cd ..
 
 ### 3) Configuração de Ambiente (sem secrets no Git)
 
-**Frontend (Next.js):**
+**Frontend (Vercel / Next.js):**
 - Copie `frontend/.env.example` → `frontend/.env.local`
-- Preencha apenas variáveis `NEXT_PUBLIC_*` (seguro expor no browser):
+- Configure apenas as variáveis públicas (seguras para o browser):
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-**Backend (Supabase Edge Functions / CLI):**
-- Copie `.env.example` → `backend/.env` (arquivo ignorado pelo Git)
-- Preencha as variáveis **server-only** (NUNCA expor no browser), incluindo `OPENAI_API_KEY`.
+**Edge Functions (Supabase):**
+- As variáveis de backend devem ser configuradas via Supabase CLI (`supabase secrets set`) ou no Painel do Supabase:
+- **Server-only (Secrets):**
+  - `PROJECT_URL`: URL base do projeto Supabase.
+  - `SERVICE_ROLE_KEY`: Chave de serviço para operações administrativas.
+  - `OPENAI_API_KEY`: Chave da API para inteligência artificial.
+  - `WEBHOOK_SECRET`: Segredo de validação para gatilhos (se configurado).
 
-> Importante: `OPENAI_API_KEY` e `SUPABASE_SERVICE_ROLE_KEY` **não** devem existir no bundle do frontend.
+> [!IMPORTANT]
+> `OPENAI_API_KEY` e `SERVICE_ROLE_KEY` são segredos críticos. **Nunca** os inclua no frontend ou em variáveis prefixadas com `NEXT_PUBLIC_`.
 
 ### 4) Banco de Dados & Supabase Local
 ```bash

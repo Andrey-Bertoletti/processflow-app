@@ -1,12 +1,12 @@
-alter table "public"."ai_generations" add column "latency_ms" integer;
+alter table "public"."ai_generations" add column if not exists "latency_ms" integer;
 
-alter table "public"."ai_generations" add column "model" text;
+alter table "public"."ai_generations" add column if not exists "model" text;
 
-alter table "public"."ai_generations" add column "prompt_hash" text;
+alter table "public"."ai_generations" add column if not exists "prompt_hash" text;
 
-alter table "public"."ai_generations" add column "status" text;
+alter table "public"."ai_generations" add column if not exists "status" text;
 
-alter table "public"."ai_generations" add column "tokens_used" integer;
+alter table "public"."ai_generations" add column if not exists "tokens_used" integer;
 
 CREATE INDEX idx_ai_generations_prompt_hash ON public.ai_generations USING btree (prompt_hash);
 

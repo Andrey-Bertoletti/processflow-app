@@ -8,11 +8,13 @@ import { toast } from "sonner";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
 import { TextField } from "@/components/ui/Field";
+import { useAuth } from "@/app/context/AuthContext";
 
 export default function CreateWorkspace() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { setActiveWorkspaceId, refreshWorkspaces } = useAuth();
 
   const handleCreate = async () => {
     if (!name.trim()) {
@@ -56,11 +58,19 @@ export default function CreateWorkspace() {
       if (seedError) {
         console.error("Erro ao criar seed do pipeline:", seedError);
         toast.warning(`Workspace criado, mas houve erro ao inicializar o funil: ${seedError.message}`);
+        if (typeof workspaceId === "string") {
+          setActiveWorkspaceId(workspaceId);
+        }
+        await refreshWorkspaces();
         router.push("/auth/dashboard");
         return;
       }
 
       toast.success("Workspace criado com sucesso!");
+      if (typeof workspaceId === "string") {
+        setActiveWorkspaceId(workspaceId);
+      }
+      await refreshWorkspaces();
       router.push("/auth/dashboard");
     } catch (error: any) {
       console.error("Erro:", error);

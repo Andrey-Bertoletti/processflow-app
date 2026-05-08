@@ -3,10 +3,10 @@
 -- ==========================================
 -- Garantimos os identificadores causais e marcação de processamento na tabela imutável
 ALTER TABLE public.job_events
-ADD COLUMN correlation_id UUID, -- Representa o "Lead Journey"
-ADD COLUMN causation_id UUID,   -- Representa o ID do evento que engatilhou este
-ADD COLUMN is_processed BOOLEAN DEFAULT false,
-ADD COLUMN processed_at TIMESTAMP WITH TIME ZONE;
+ADD COLUMN IF NOT EXISTS correlation_id UUID, -- Representa o "Lead Journey"
+ADD COLUMN IF NOT EXISTS causation_id UUID,   -- Representa o ID do evento que engatilhou este
+ADD COLUMN IF NOT EXISTS is_processed BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS processed_at TIMESTAMP WITH TIME ZONE;
 
 -- Index rápido para a Projection Engine varrer eventos novos e ordenar cronologicamente
 CREATE INDEX IF NOT EXISTS idx_job_events_unprocessed 

@@ -14,10 +14,48 @@ export type StageWithLeads = Stage & {
   leads: LeadWithCustomFieldValues[];
 };
 
+/** Embedded columns for Kanban + validação de transição (sem messages/events em massa). */
+const PIPELINE_LEADS_SELECT = `
+  id,
+  workspace_id,
+  stage_id,
+  name,
+  email,
+  phone,
+  company,
+  role,
+  source,
+  notes,
+  assigned_to,
+  campaign_id,
+  metadata,
+  created_at,
+  updated_at,
+  lead_insights(sentiment, score),
+  lead_custom_field_values(
+    id,
+    workspace_id,
+    lead_id,
+    custom_field_id,
+    value,
+    created_at,
+    updated_at,
+    workspace_custom_fields(
+      id,
+      name,
+      key,
+      field_type,
+      required,
+      options,
+      is_active
+    )
+  )
+`.replace(/\s+/g, " ");
+
 export async function fetchPipelineData(workspaceId: string): Promise<StageWithLeads[]> {
   const { data: stages, error: stagesError } = await supabase
     .from("stages")
-    .select("*, leads(*, lead_insights(*), lead_custom_field_values(*, workspace_custom_fields(*)), messages(*), lead_events(*))")
+    .select(`*, leads(${PIPELINE_LEADS_SELECT})`)
     .eq("workspace_id", workspaceId)
     .order("order", { ascending: true })
     .order("created_at", { ascending: false, foreignTable: "leads" });
@@ -34,7 +72,6 @@ export async function fetchPipelineData(workspaceId: string): Promise<StageWithL
     };
   });
 }
-
 
 // Placeholder para futura integração com dnd-kit.
 export async function moveLeadToStagePlaceholder(params: {
@@ -102,4 +139,3 @@ export function validateLeadMovement(
 
   return missingFields;
 }
-

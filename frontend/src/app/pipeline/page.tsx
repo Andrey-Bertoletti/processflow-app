@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useAuth } from "@/app/context/AuthContext";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { Plus, RefreshCw, LayoutDashboard, Zap, Settings } from "lucide-react";
+import { Plus, RefreshCw, LayoutDashboard, Zap, Settings, Briefcase, Search, Filter, AlertTriangle } from "lucide-react";
 
 import KanbanBoard from "@/components/pipeline/KanbanBoard";
 import LeadCreateDrawer from "@/components/pipeline/LeadCreateDrawer";
@@ -58,6 +58,12 @@ export default function PipelinePage() {
     missingFields: string[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  
+  // Filtros e Busca
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterAssignee, setFilterAssignee] = useState("");
+  const [filterStage, setFilterStage] = useState("");
+  const [filterCampaign, setFilterCampaign] = useState("");
 
   const stageList = useMemo<Stage[]>(
     () =>
@@ -81,6 +87,31 @@ export default function PipelinePage() {
 
     return stages.flatMap((stage) => stage.leads).find((lead: Lead) => lead.id === selectedLeadId) || null;
   }, [selectedLeadId, stages]);
+
+  const filteredStages = useMemo(() => {
+    let baseStages = stages;
+    if (filterStage) {
+      baseStages = stages.filter(s => s.id === filterStage);
+    }
+
+    return baseStages.map(stage => ({
+      ...stage,
+      leads: stage.leads.filter(lead => {
+        const query = searchQuery.toLowerCase();
+        const matchesSearch = !searchQuery || 
+          lead.name.toLowerCase().includes(query) || 
+          (lead.company?.toLowerCase() || "").includes(query);
+        
+        const matchesAssignee = !filterAssignee || lead.assigned_to === filterAssignee;
+        const matchesCampaign = !filterCampaign || lead.campaign_id === filterCampaign;
+        
+        return matchesSearch && matchesAssignee && matchesCampaign;
+      })
+    }));
+  }, [stages, searchQuery, filterAssignee, filterStage, filterCampaign]);
+
+  const hasLeadsAtAll = stages.some(s => s.leads.length > 0);
+  const hasFilteredResults = filteredStages.some(s => s.leads.length > 0);
 
   const updateLeadInState = (updatedLead: Lead) => {
     setStages((currentStages) => {
@@ -122,8 +153,14 @@ export default function PipelinePage() {
       const [pipelineData, memberData, campaignData, customFieldsData] = await Promise.all([
         fetchPipelineData(activeWorkspaceId),
         fetchWorkspaceMembers(activeWorkspaceId),
-        supabase.from("campaigns").select("*").eq("workspace_id", activeWorkspaceId),
-        supabase.from("workspace_custom_fields").select("*").eq("workspace_id", activeWorkspaceId),
+        supabase
+          .from("campaigns")
+          .select("id, workspace_id, name, status, context, base_prompt, created_at, updated_at")
+          .eq("workspace_id", activeWorkspaceId),
+        supabase
+          .from("workspace_custom_fields")
+          .select("id, workspace_id, name, key, field_type, required, options, is_active, created_at, updated_at")
+          .eq("workspace_id", activeWorkspaceId),
       ]);
  
       setStages(pipelineData);
@@ -356,8 +393,15 @@ export default function PipelinePage() {
 
   if (!user) {
     return (
-      <main className="app-shell flex min-h-screen items-center justify-center px-4">
-        <p className="text-red-300">Nao autorizado</p>
+      <main className="app-shell flex min-h-screen items-center justify-center px-4 py-10">
+        <Surface className="w-full max-w-md p-8 text-center space-y-4">
+          <AlertTriangle className="mx-auto h-10 w-10 text-amber-400" />
+          <h1 className="text-lg font-semibold text-white">Sessão necessária</h1>
+          <p className="text-sm text-zinc-400">Faça login para acessar o funil de leads.</p>
+          <Link href="/auth/login" className="app-button app-button-primary inline-flex">
+            Ir para login
+          </Link>
+        </Surface>
       </main>
     );
   }
@@ -408,10 +452,16 @@ export default function PipelinePage() {
               Dashboard
             </Link>
             {isAdmin ? (
-              <Link href="/admin/settings/fields" className="app-button app-button-secondary text-sm" title="Campos Customizados">
-                <Settings className="h-4 w-4" />
-                Campos
-              </Link>
+              <>
+                <Link href="/campaigns" className="app-button app-button-secondary text-sm" title="Gerenciar Campanhas">
+                  <Briefcase className="h-4 w-4" />
+                  Campanhas
+                </Link>
+                <Link href="/admin/settings/fields" className="app-button app-button-secondary text-sm" title="Campos Customizados">
+                  <Settings className="h-4 w-4" />
+                  Campos
+                </Link>
+              </>
             ) : null}
             {isSavingMove && (
 
@@ -422,10 +472,84 @@ export default function PipelinePage() {
           </div>
         </Surface>
 
+        {/* Filtros e Busca */}
+        <Surface className="mb-6 p-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+              <input
+                type="text"
+                placeholder="Buscar lead ou empresa..."
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-10 pr-4 py-2 text-sm text-white focus:border-blue-500 focus:outline-none transition-colors"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <Filter className="h-4 w-4 text-slate-500" />
+              <select
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none min-w-[160px]"
+                value={filterAssignee}
+                onChange={(e) => setFilterAssignee(e.target.value)}
+              >
+                <option value="">Todos Responsáveis</option>
+                {members.map(m => (
+                  <option key={m.id} value={m.userId}>{m.displayName}</option>
+                ))}
+              </select>
+
+              <select
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none min-w-[160px]"
+                value={filterStage}
+                onChange={(e) => setFilterStage(e.target.value)}
+              >
+                <option value="">Todas as Etapas</option>
+                {stageList.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
+
+              <select
+                className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:border-blue-500 focus:outline-none min-w-[160px]"
+                value={filterCampaign}
+                onChange={(e) => setFilterCampaign(e.target.value)}
+              >
+                <option value="">Todas as Campanhas</option>
+                {campaigns.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+
+              {(searchQuery || filterAssignee || filterStage || filterCampaign) && (
+                <button
+                  onClick={() => {
+                    setSearchQuery("");
+                    setFilterAssignee("");
+                    setFilterStage("");
+                    setFilterCampaign("");
+                  }}
+                  className="text-xs text-blue-400 hover:text-blue-300 font-medium ml-2"
+                >
+                  Limpar Filtros
+                </button>
+              )}
+            </div>
+          </div>
+        </Surface>
+
         {error ? (
-          <Surface className="mb-4 flex items-center gap-2 border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
-            <span className="text-red-400">âš </span> {error}
-            <button onClick={() => setError(null)} className="ml-auto text-red-400 hover:text-red-300 text-lg leading-none">&times;</button>
+          <Surface className="mb-4 flex items-start gap-3 border border-red-500/25 bg-red-500/10 p-4 text-sm text-red-200">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" aria-hidden />
+            <p className="min-w-0 flex-1 leading-relaxed">{error}</p>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="shrink-0 rounded-lg px-2 py-1 text-red-300 hover:bg-red-500/20"
+              aria-label="Fechar aviso"
+            >
+              &times;
+            </button>
           </Surface>
         ) : null}
 
@@ -454,10 +578,33 @@ export default function PipelinePage() {
         ) : (
 
           <KanbanBoard
-            stages={stages}
+            stages={filteredStages}
             onDropLeadPlaceholder={moveLeadOptimistically}
             onLeadClick={(leadId) => setSelectedLeadId(leadId)}
           />
+        )}
+
+        {/* Empty State para Busca/Filtro */}
+        {hasLeadsAtAll && !hasFilteredResults && (
+          <Surface className="mt-8 p-12 text-center border-dashed">
+            <div className="text-3xl mb-3">🔍</div>
+            <h3 className="text-lg font-semibold text-white">Nenhum lead encontrado</h3>
+            <p className="text-slate-400 mt-2">
+              Não encontramos nenhum lead que corresponda aos filtros aplicados.
+            </p>
+            <Button
+              variant="secondary"
+              className="mt-4"
+              onClick={() => {
+                setSearchQuery("");
+                setFilterAssignee("");
+                setFilterStage("");
+                setFilterCampaign("");
+              }}
+            >
+              Limpar Filtros
+            </Button>
+          </Surface>
         )}
       </div>
 
@@ -484,6 +631,7 @@ export default function PipelinePage() {
         onClose={() => setSelectedLeadId(null)}
         onSave={handleUpdateLead}
         onDelete={handleDeleteLead}
+        onAfterSend={loadPipeline}
         isDeleting={isDeletingLead}
       />
 

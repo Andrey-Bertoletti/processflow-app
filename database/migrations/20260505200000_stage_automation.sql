@@ -1,10 +1,10 @@
 -- 1. Adicionando coluna 'auto_campaign_id' na tabela 'stages'
 ALTER TABLE public.stages
-ADD COLUMN auto_campaign_id UUID REFERENCES public.campaigns(id) ON DELETE SET NULL;
+ADD COLUMN IF NOT EXISTS auto_campaign_id UUID REFERENCES public.campaigns(id) ON DELETE SET NULL;
 
 -- 2. Adicionando coluna 'is_automated' na tabela 'messages'
 ALTER TABLE public.messages
-ADD COLUMN is_automated BOOLEAN DEFAULT false;
+ADD COLUMN IF NOT EXISTS is_automated BOOLEAN DEFAULT false;
 
 -- (Opcional, caso não exista a tabela messages)
 CREATE TABLE IF NOT EXISTS public.messages (

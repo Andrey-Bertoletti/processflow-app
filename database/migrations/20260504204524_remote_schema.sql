@@ -1,4 +1,4 @@
-alter table "public"."leads" add column "campaign_id" uuid;
+alter table "public"."leads" add column if not exists "campaign_id" uuid;
 
 CREATE INDEX idx_leads_campaign ON public.leads USING btree (campaign_id);
 

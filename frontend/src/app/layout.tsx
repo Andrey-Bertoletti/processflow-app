@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
 import { Inter } from "next/font/google";
+import { Header } from "@/components/layout/Header";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -19,8 +20,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR" className={inter.variable}>
-      <body>
-        <AppProviders>{children}</AppProviders>
+      <body className="bg-slate-950 text-slate-200 min-h-screen selection:bg-blue-500/30">
+        <AppProviders>
+          <Header />
+          <main className="relative">{children}</main>
+        </AppProviders>
         <Toaster
           position="bottom-right"
           theme="dark"

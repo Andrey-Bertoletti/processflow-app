@@ -1,8 +1,8 @@
 -- 1. Status na tabela messages para gerenciar filas (pending, success, error)
-ALTER TABLE public.messages ADD COLUMN status TEXT DEFAULT 'success';
+ALTER TABLE public.messages ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'generated';
 
 -- Atualiza as atuais para success para não quebrar compatibilidade
-UPDATE public.messages SET status = 'success' WHERE status IS NULL;
+UPDATE public.messages SET status = 'generated' WHERE status IS NULL;
 
 -- 2. Tabela de logs e idempotência de automação
 CREATE TABLE IF NOT EXISTS public.automation_logs (

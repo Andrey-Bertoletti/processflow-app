@@ -34,8 +34,16 @@ ALTER TABLE public.lead_custom_field_values
 
 DO $$
 BEGIN
-  ALTER TABLE public.lead_custom_field_values
-    ADD CONSTRAINT lead_custom_field_values_pkey PRIMARY KEY (id);
+  IF NOT EXISTS (
+    SELECT 1 
+    FROM information_schema.table_constraints 
+    WHERE table_schema = 'public' 
+      AND table_name = 'lead_custom_field_values' 
+      AND constraint_type = 'PRIMARY KEY'
+  ) THEN
+    ALTER TABLE public.lead_custom_field_values
+      ADD CONSTRAINT lead_custom_field_values_pkey PRIMARY KEY (id);
+  END IF;
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;

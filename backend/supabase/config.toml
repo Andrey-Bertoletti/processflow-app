@@ -423,6 +423,12 @@ enabled = true
 verify_jwt = true
 entrypoint = "./functions/generate-message/index.ts"
 
+[functions.ai-worker]
+enabled = true
+# Cron/ops: proteja com WEBHOOK_SECRET (header x-webhook-secret) configurado no painel da função.
+verify_jwt = false
+entrypoint = "./functions/ai-worker/index.ts"
+
 [functions.semantic-analysis]
 enabled = true
 verify_jwt = true

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Json, LeadFormPayload, Stage, WorkspaceCustomField, WorkspaceMember } from "@/types/database.types";
 import { useAuth } from "@/app/context/AuthContext";
 import Button from "@/components/ui/Button";
@@ -8,8 +8,10 @@ import Surface from "@/components/ui/Surface";
 import { SelectField, TextField } from "@/components/ui/Field";
 import { supabase } from "@/lib/supabase/client";
 import { toast } from "sonner";
+import { AlertTriangle, CheckCircle2, Clock, History, MessageSquare, RefreshCw, Send, Sparkles, Zap } from "lucide-react";
 import LeadCustomFieldInputs from "@/components/custom-fields/LeadCustomFieldInputs";
 import { buildLeadCustomFieldValuesDraft, type LeadWithCustomFieldValues } from "@/lib/custom-fields";
+import { LeadTimeline } from "./LeadTimeline";
 
 type LeadDetailsDrawerProps = {
   lead: LeadWithCustomFieldValues | null;
@@ -23,6 +25,7 @@ type LeadDetailsDrawerProps = {
   onClose: () => void;
   onSave: (payload: LeadFormPayload) => Promise<void>;
   onDelete: () => Promise<void>;
+  onAfterSend?: () => void;
 };
 
 type LeadDetailsFormState = {
@@ -67,12 +70,40 @@ export default function LeadDetailsDrawer({
   onClose,
   onSave,
   onDelete,
+  onAfterSend,
 }: LeadDetailsDrawerProps) {
   const [form, setForm] = useState(() => buildInitialForm(lead, customFields));
-  const [localMessages, setLocalMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const leadId = lead?.id ?? null;
+
+  const refreshMessages = useCallback(async () => {
+    if (!leadId) return;
+
+    setIsLoadingMessages(true);
+    setMessagesError(null);
+    try {
+      const { data, error } = await supabase
+        .from("messages")
+        .select("id, lead_id, campaign_id, content, status, variation_index, is_automated, metadata, created_at, updated_at, sent_at")
+        .eq("lead_id", leadId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("[MESSAGES_LOAD_ERR]", error);
+        setMessagesError(error.message);
+        return;
+      }
+
+      setMessages(Array.isArray(data) ? data : []);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  }, [leadId]);
 
   useEffect(() => {
     if (!lead || !isOpen) {
@@ -80,7 +111,22 @@ export default function LeadDetailsDrawer({
     }
 
     setForm(buildInitialForm(lead, customFields));
-  }, [lead, isOpen, customFields]);
+    setMessages(Array.isArray((lead as any).messages) ? (lead as any).messages : []);
+    void refreshMessages();
+  }, [lead, isOpen, customFields, refreshMessages]);
+
+  const hasPendingMessages = useMemo(() => messages.some((m) => m?.status === "pending"), [messages]);
+
+  useEffect(() => {
+    if (!isOpen || !leadId) return;
+    if (!hasPendingMessages) return;
+
+    const intervalId = setInterval(() => {
+      void refreshMessages();
+    }, 4000);
+
+    return () => clearInterval(intervalId);
+  }, [hasPendingMessages, isOpen, leadId, refreshMessages]);
 
   if (!isOpen || !lead) {
     return null;
@@ -104,8 +150,9 @@ export default function LeadDetailsDrawer({
     });
   };
 
-  const handleGenerateMessages = async (forceRegenerate = false) => {
-    if (!form.campaignId) {
+  const handleGenerateMessages = async (forceRegenerate = false, campaignIdOverride?: string) => {
+    const targetCampaignId = campaignIdOverride ?? form.campaignId;
+    if (!targetCampaignId) {
       toast.error("Selecione uma campanha primeiro.");
       return;
     }
@@ -115,7 +162,7 @@ export default function LeadDetailsDrawer({
       const { data, error } = await supabase.functions.invoke("generate-message", {
         body: { 
           lead_id: lead.id, 
-          campaign_id: form.campaignId,
+          campaign_id: targetCampaignId,
           variations_count: 3,
           force_regenerate: forceRegenerate
         },
@@ -123,14 +170,18 @@ export default function LeadDetailsDrawer({
       
       if (error) throw error;
       
-      // Se a Edge Function retorna um array de objetos de mensagem
+      if (data?.success === false) {
+        throw new Error(data.detail || data.error || "Erro na geração da IA");
+      }
+      
       if (data?.messages) {
-        setLocalMessages(data.messages);
-        toast.success(forceRegenerate ? "Novas sugestões geradas!" : "Sugestões carregadas!");
+        await refreshMessages();
+        toast.success(forceRegenerate ? "Novas sugestões geradas!" : "Sugestões geradas!");
       }
     } catch (error: any) {
       console.error("[GENERATE_ERROR]", error);
-      toast.error(error?.message || "Erro ao gerar mensagens.");
+      const detail = error?.message || "Erro desconhecido";
+      toast.error(`Erro: ${detail}`);
     } finally {
       setIsGenerating(false);
     }
@@ -141,7 +192,7 @@ export default function LeadDetailsDrawer({
     
     setIsSending(true);
     try {
-      const { data, error } = await (supabase.rpc as any)("send_message_simulated", {
+      const { error } = await (supabase.rpc as any)("send_message_simulated", {
         p_message_id: messageId,
         p_lead_id: lead.id
       });
@@ -149,9 +200,9 @@ export default function LeadDetailsDrawer({
       if (error) throw error;
 
       toast.success("Abordagem iniciada! Lead movido para 'Tentando Contato'.");
-      
+      await refreshMessages();
+      onAfterSend?.();
       onClose();
-      window.location.reload(); 
     } catch (error: any) {
       console.error("[SEND_ERROR]", error);
       toast.error(error?.message || "Erro ao simular envio.");
@@ -161,8 +212,8 @@ export default function LeadDetailsDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-sm">
-      <Surface className="h-full w-full max-w-lg overflow-y-auto rounded-none border-l-0 p-5 shadow-2xl">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/60 backdrop-blur-sm animate-fade-in">
+      <Surface className="h-full w-full sm:max-w-lg overflow-y-auto rounded-none border-l border-white/5 p-5 shadow-2xl animate-slide-in">
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-lg font-bold text-white">Detalhes do Lead</h2>
           <Button type="button" variant="secondary" onClick={onClose}>
@@ -269,7 +320,6 @@ export default function LeadDetailsDrawer({
             ))}
           </SelectField>
 
-          {/* Seletor de Campanha movido para ser o último antes das ações ou integrado ao painel de IA */}
           <SelectField
             label="Campanha para IA"
             value={form.campaignId}
@@ -291,137 +341,269 @@ export default function LeadDetailsDrawer({
               {isDeleting ? "Excluindo..." : "Excluir"}
             </Button>
           </div>
-
         </form>
 
+        <section className="mt-8 space-y-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+            <h3 className="font-bold text-white">Mensagens Enviadas</h3>
+          </div>
+
+          <div className="space-y-4">
+            {messages.filter((m: any) => m.status === "sent").length === 0 ? (
+              <p className="py-4 text-center text-xs text-slate-500 italic">
+                Nenhuma abordagem enviada para este lead ainda.
+              </p>
+            ) : (
+              messages
+                .filter((m: any) => m.status === "sent")
+                .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+                .map((msg: any) => {
+                  const campaign = campaigns.find(c => c.id === msg.campaign_id);
+                  return (
+                    <div key={msg.id} className="relative rounded-lg border border-emerald-500/10 bg-slate-900/40 p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                            Campanha: {campaign?.name || "Geral"}
+                          </span>
+                          {msg.is_automated ? (
+                            <span className="app-pill border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-[10px]">
+                              <Zap className="h-3 w-3" />
+                              Automação
+                            </span>
+                          ) : null}
+                          <span className="app-pill border-emerald-500/30 bg-emerald-500/10 text-emerald-200 text-[10px]">
+                            <CheckCircle2 className="h-3 w-3" />
+                            Enviada
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-500">
+                          {new Date(msg.sent_at || msg.updated_at).toLocaleString("pt-BR")}
+                        </span>
+                      </div>
+                      <p className="text-sm leading-relaxed text-slate-300">{msg.content}</p>
+                      <div className="mt-3 flex justify-end border-t border-slate-800 pt-3">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="px-2 py-1 text-[10px] text-emerald-400 hover:bg-emerald-500/10"
+                          onClick={() => {
+                            navigator.clipboard.writeText(msg.content);
+                            toast.success("Copiado!");
+                          }}
+                        >
+                          Copiar Conteúdo
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })
+            )}
+          </div>
+        </section>
+
         <section className="mt-8 space-y-4 rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2">
-              <span className="text-xl">💬</span>
-              <h3 className="font-bold text-white">Mensagens IA</h3>
+              <MessageSquare className="h-5 w-5 text-indigo-400" />
+              <h3 className="font-bold text-white">Mensagens da IA</h3>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                leftIcon={<RefreshCw className={`h-4 w-4 ${isLoadingMessages ? "animate-spin" : ""}`} />}
+                onClick={() => void refreshMessages()}
+                disabled={isLoadingMessages}
+                className="text-xs"
+                title="Atualizar status das mensagens"
+              >
+                Atualizar
+              </Button>
               <Button
                 type="button"
                 variant="secondary"
+                size="sm"
+                leftIcon={<Sparkles className="h-4 w-4" />}
                 onClick={() => handleGenerateMessages(false)}
                 disabled={isGenerating || !form.campaignId}
                 className="text-xs"
               >
-                {isGenerating ? "Buscando..." : "✨ Ver Sugestões"}
+                {isGenerating ? "Gerando..." : "Gerar 3 mensagens"}
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="ghost"
+                size="sm"
+                leftIcon={<RefreshCw className="h-4 w-4" />}
                 onClick={() => handleGenerateMessages(true)}
                 disabled={isGenerating || !form.campaignId}
                 className="text-xs"
                 title="Forçar IA a gerar novas opções"
               >
-                {isGenerating ? "Gerando..." : "🔄 Regenerar"}
+                Regenerar
               </Button>
             </div>
-
-
           </div>
 
           <div className="space-y-4">
-            {localMessages.length === 0 && !(lead as any).messages?.length && (
-              <p className="py-4 text-center text-xs text-slate-500 italic">
-                Nenhuma mensagem gerada para este lead ainda.
-              </p>
-            )}
-            
-            {/* Unificar mensagens do banco com locais (recém geradas) */}
-            {[...((lead as any).messages || []), ...localMessages]
-              .filter((msg, index, self) => 
-                // Evitar duplicatas se a mesma mensagem aparecer no banco e no local
-                index === self.findIndex((m) => (m.id && m.id === msg.id) || m.content === msg.content)
-              )
-              .sort((a, b) => (a.variation_index ?? 0) - (b.variation_index ?? 0))
-              .map((msg: any) => {
-                const styles = ["Direto", "Consultivo", "Criativo"];
-                const styleName = msg.metadata?.style || styles[msg.variation_index] || "IA";
-                
-                return (
-                  <div key={msg.id || msg.content} className="group relative rounded-lg border border-slate-700 bg-slate-900/50 p-4 transition-all hover:border-indigo-500/40">
-                    <div className="mb-2 flex items-center justify-between">
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
-                        Estilo: {styleName}
-                      </span>
-                      {msg.status === 'sent' && (
-                        <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded">ENVIADA</span>
-                      )}
-                    </div>
-                    <p className="text-sm leading-relaxed text-slate-200">{msg.content}</p>
-                    <div className="mt-3 flex items-center justify-end border-t border-slate-700/50 pt-3">
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          className="px-2 py-1 text-[10px]"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(msg.content);
-                              toast.success("Copiado!");
-                            } catch (err) {
-                              alert("Copie manualmente: " + msg.content);
-                            }
-                          }}
-                        >
-                          Copiar
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="primary"
-                          className="px-2 py-1 text-[10px]"
-                          disabled={isSending || msg.status === 'sent' || !msg.id}
-                          title={!msg.id ? "Salve ou recarregue para enviar mensagens recém geradas" : ""}
-                          onClick={() => handleSend(msg.id)}
-                        >
-                          {isSending ? "Enviando..." : msg.status === 'sent' ? "Enviada" : "Enviar"}
-                        </Button>
+            {messagesError ? (
+              <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4">
+                <div className="flex items-start gap-2 text-red-200">
+                  <AlertTriangle className="h-4 w-4 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">Não foi possível carregar as mensagens.</p>
+                    <p className="mt-0.5 text-xs text-red-200/70 break-words">{messagesError}</p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {isLoadingMessages && messages.length === 0 ? (
+              <div className="h-24 animate-pulse rounded-lg bg-slate-900/40 border border-slate-800/50" />
+            ) : null}
+
+            {messages.filter((m: any) => m.status !== "sent").length === 0 && !isLoadingMessages ? (
+              <div className="py-5 text-center">
+                <p className="text-sm font-medium text-slate-200">Nenhuma mensagem ainda</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Selecione uma campanha e clique em <span className="font-medium text-slate-200">Gerar 3 mensagens</span>.
+                  Se a etapa tiver automação, você verá o status <span className="font-mono">pending</span> até a IA finalizar.
+                </p>
+              </div>
+            ) : (
+              messages
+                .filter((m: any) => m.status !== "sent")
+                .sort((a: any, b: any) => {
+                  const rank: Record<string, number> = { pending: 0, failed: 1, generated: 2 };
+                  const ar = rank[String(a?.status)] ?? 99;
+                  const br = rank[String(b?.status)] ?? 99;
+                  if (ar !== br) return ar - br;
+                  const ai = typeof a?.variation_index === "number" ? a.variation_index : 0;
+                  const bi = typeof b?.variation_index === "number" ? b.variation_index : 0;
+                  if (ai !== bi) return ai - bi;
+                  return new Date(b?.created_at ?? b?.updated_at ?? 0).getTime() - new Date(a?.created_at ?? a?.updated_at ?? 0).getTime();
+                })
+                .map((msg: any) => {
+                  const campaign = campaigns.find((c) => c.id === msg.campaign_id);
+                  const styles = ["Direto", "Consultivo", "Criativo"];
+                  const rawStyle = typeof msg.metadata?.style === "string" ? msg.metadata.style : null;
+                  const styleName = rawStyle
+                    ? rawStyle.charAt(0).toUpperCase() + rawStyle.slice(1)
+                    : styles[msg.variation_index] || "IA";
+
+                  const status = String(msg.status || "generated");
+                  const statusUi =
+                    status === "pending"
+                      ? { label: "Pendente", cls: "border-amber-500/20 bg-amber-500/10 text-amber-200", icon: <Clock className="h-3 w-3" /> }
+                      : status === "failed"
+                        ? { label: "Falhou", cls: "border-red-500/20 bg-red-500/10 text-red-200", icon: <AlertTriangle className="h-3 w-3" /> }
+                        : { label: "Gerada", cls: "border-emerald-500/20 bg-emerald-500/10 text-emerald-200", icon: <CheckCircle2 className="h-3 w-3" /> };
+
+                  const canSend = status === "generated" && Boolean(msg.id);
+                  const sendTitle =
+                    status === "pending"
+                      ? "Aguarde a automação concluir."
+                      : status === "failed"
+                        ? "A IA falhou. Tente regenerar."
+                        : !msg.id
+                          ? "Recarregue para enviar mensagens recém geradas."
+                          : "";
+
+                  return (
+                    <div key={msg.id || msg.content} className="group relative rounded-lg border border-slate-700 bg-slate-900/50 p-4 transition-all hover:border-indigo-500/40">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-300 truncate">
+                            {campaign?.name ? `Campanha: ${campaign.name}` : "Campanha: Geral"}
+                          </span>
+                          <span className="text-[10px] text-slate-500">• Estilo: {styleName}</span>
+                          {msg.is_automated ? (
+                            <span className="app-pill border-indigo-500/30 bg-indigo-500/10 text-indigo-200 text-[10px]">
+                              <Zap className="h-3 w-3" />
+                              Automação
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-semibold uppercase tracking-wider ${statusUi.cls}`}>
+                          {statusUi.icon}
+                          {statusUi.label}
+                        </span>
+                      </div>
+
+                      <p className="text-sm leading-relaxed text-slate-200">{msg.content}</p>
+
+                      <div className="mt-3 flex items-center justify-between border-t border-slate-700/50 pt-3">
+                        {status === "failed" && msg.campaign_id ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            leftIcon={<RefreshCw className="h-4 w-4" />}
+                            disabled={isGenerating}
+                            onClick={() => handleGenerateMessages(true, msg.campaign_id)}
+                            className="text-xs"
+                            title="Gerar novamente para esta campanha"
+                          >
+                            Tentar novamente
+                          </Button>
+                        ) : (
+                          <span className="text-[10px] text-slate-500">
+                            {msg.created_at ? new Date(msg.created_at).toLocaleString("pt-BR") : ""}
+                          </span>
+                        )}
+
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="px-2 py-1 text-[10px]"
+                            onClick={async () => {
+                              try {
+                                await navigator.clipboard.writeText(msg.content);
+                                toast.success("Copiado!");
+                              } catch {
+                                toast.error("Não foi possível copiar. Selecione o texto manualmente.");
+                              }
+                            }}
+                          >
+                            Copiar
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            className="px-2 py-1 text-[10px]"
+                            disabled={isSending || !canSend}
+                            title={sendTitle}
+                            onClick={() => handleSend(msg.id)}
+                          >
+                            {isSending ? "Enviando..." : "Enviar"}
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
-
+                  );
+                })
+            )}
           </div>
         </section>
         
-        {/* Phase 11: Timeline Section */}
         <section className="mt-8 space-y-4">
           <div className="flex items-center gap-2 border-b border-slate-700/50 pb-2">
-            <span className="text-xl">⏳</span>
-            <h3 className="font-bold text-white">Linha do Tempo</h3>
+            <History className="h-5 w-5 text-indigo-400" />
+            <h3 className="font-bold text-white">Histórico e Atividades</h3>
           </div>
           
-          <div className="space-y-4">
-            {((lead as any).lead_events || []).length === 0 && (
-              <p className="text-center text-xs text-slate-500 italic py-2">Sem histórico disponível.</p>
-            )}
-            
-            {((lead as any).lead_events || [])
-              .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-              .map((event: any) => (
-                <div key={event.id} className="relative pl-6 border-l-2 border-slate-700 pb-2 last:pb-0">
-                  <div className="absolute -left-[9px] top-1.5 h-4 w-4 rounded-full border-2 border-slate-900 bg-indigo-500" />
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                      {new Date(event.created_at).toLocaleString()}
-                    </span>
-                    <p className="text-xs font-semibold text-slate-200">
-                      {event.type === 'message_sent' ? '📨 Mensagem Enviada' : 
-                       event.type === 'stage_changed' ? '🚀 Mudança de Etapa' : event.type}
-                    </p>
-                    <p className="text-[11px] text-slate-400 leading-tight mt-0.5">{event.description}</p>
-                  </div>
-                </div>
-              ))}
+          <div className="pt-2">
+            <LeadTimeline leadId={lead.id} />
           </div>
         </section>
-
       </Surface>
     </div>
   );

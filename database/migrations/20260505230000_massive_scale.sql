@@ -1,7 +1,7 @@
 -- 1. Job Priority System & Observability
 ALTER TABLE public.job_queue
-ADD COLUMN priority INT DEFAULT 0, -- 0=Low, 1=Medium, 2=High
-ADD COLUMN trace_id UUID DEFAULT gen_random_uuid(); -- Para rastrear os logs
+ADD COLUMN IF NOT EXISTS priority INT DEFAULT 0, -- 0=Low, 1=Medium, 2=High
+ADD COLUMN IF NOT EXISTS trace_id UUID DEFAULT gen_random_uuid(); -- Para rastrear os logs
 
 -- 2. Dead Letter Queue (DLQ)
 CREATE TABLE IF NOT EXISTS public.dead_letter_queue (

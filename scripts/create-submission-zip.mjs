@@ -1,163 +1,162 @@
 #!/usr/bin/env node
 
-import { createWriteStream, statSync, readdirSync } from 'fs';
-import { join, relative } from 'path';
+import { createWriteStream } from 'fs';
+import { join } from 'path';
 import { fileURLToPath } from 'url';
 import archiver from 'archiver';
+import { execSync } from 'child_process';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = join(__filename, '..');
 const projectRoot = join(__dirname, '..');
 
-// Padrões de arquivo/pasta a EXCLUIR (segurança + tamanho)
-const EXCLUDE_PATTERNS = [
-  // Secrets e configuração privada
-  /^\.env$/,
-  /^\.env\./,
-  /backend\/\.env$/,
-  /backend\/\.env\./,
-  /frontend\/\.env$/,
-  /frontend\/\.env\./,
-  /backend\/supabase\/\.temp\//,
-  /frontend\/supabase\/\.temp\//,
+// ==========================================
+// CONFIGURAÇÃO DE SEGURANÇA
+// ==========================================
 
-  // Git e controle de versão
-  /^\.git\//,
-  /\.git$/,
-
-  // Node.js e dependências
-  /^node_modules\//,
-  /\/node_modules\//,
-  /^frontend\/node_modules\//,
-  /^backend\/node_modules\//,
-
-  // Build e cache
-  /^\.next\//,
-  /^frontend\/\.next\//,
-  /^\.vercel\//,
-  /^frontend\/\.vercel\//,
-  /^dist\//,
-  /^build\//,
-  /^\.turbo\//,
-  /^\.cache\//,
-
-  // Logs e temporários
+const FORBIDDEN_PATTERNS = [
+  // Secrets e Configuração (exceto .example)
+  /\.env$/,
+  /\.env\.(?!example$)[^/]+$/,
+  
+  // Node.js e Dependências
+  /(^|\/)node_modules($|\/)/,
+  
+  // Build e Cache
+  /(^|\/)\.next($|\/)/,
+  /(^|\/)\.vercel($|\/)/,
+  /(^|\/)dist($|\/)/,
+  /(^|\/)build($|\/)/,
+  
+  // Controle de Versão
+  /(^|\/)\.git($|\/)/,
+  
+  // Temporários do Supabase
+  /\.temp($|\/)/,
+  
+  // Logs e Lixo
   /\.log$/,
-  /\.log\./,
   /npm-debug\.log/,
-  /yarn-error\.log/,
-  /^\.DS_Store$/,
-  /^Thumbs\.db$/,
-
-  // ZIP anterior (evita recursão)
-  /processflow-submission\.zip$/,
-  /processflow-.*\.zip$/,
+  /\.DS_Store$/,
+  /Thumbs\.db$/,
+  /processflow-submission\.zip$/
 ];
 
-// Padrões PERMITIDOS (exceções para .env.example)
 const ALLOW_PATTERNS = [
-  /\.env\.example$/,
-  /frontend\/\.env\.example$/,
-  /backend\/\.env\.example$/,
+  /\.env(\.[^/]+)?\.example$/,
 ];
 
-function shouldExclude(filePath) {
+function isForbidden(filePath) {
   const normalizedPath = filePath.replace(/\\/g, '/');
-
-  // Permitir .env.example e variantes
-  for (const allowPattern of ALLOW_PATTERNS) {
-    if (allowPattern.test(normalizedPath)) {
-      return false;
-    }
+  
+  // 1. Verificar se é permitido (exceção prioritária)
+  for (const allow of ALLOW_PATTERNS) {
+    if (allow.test(normalizedPath)) return false;
   }
-
-  // Excluir padrões perigosos
-  for (const excludePattern of EXCLUDE_PATTERNS) {
-    if (excludePattern.test(normalizedPath)) {
-      return true;
-    }
+  
+  // 2. Verificar se é proibido
+  for (const forbidden of FORBIDDEN_PATTERNS) {
+    if (forbidden.test(normalizedPath)) return true;
   }
-
+  
   return false;
 }
 
-function validateZipContents(zipPath, expectedEntries) {
-  // Nota: validação básica - em produção usaria archiver.list() ou similar
-  console.log(`✓ ZIP criado: ${zipPath}`);
-  console.log(`✓ Total de arquivos: ${expectedEntries}`);
-
-  // Checklist de segurança
-  console.log('\n🔍 Validação de Segurança:');
-  const dangerousPatterns = [/\.env[^.]/i, /secret/i, /api[_-]key/i, /password/i];
-  console.log('✓ ZIP não deve conter: .env, secrets, API keys');
-  console.log('✓ ZIP não deve conter: node_modules, .git, .next, .vercel');
-
-  return true;
-}
+// ==========================================
+// PROCESSO DE COMPACTAÇÃO
+// ==========================================
 
 async function createSubmissionZip() {
   const outputPath = join(projectRoot, 'processflow-submission.zip');
-
-  console.log('📦 Criando submission ZIP seguro...\n');
+  console.log('📦 Iniciando criação do ZIP de submissão...\n');
 
   const output = createWriteStream(outputPath);
   const archive = archiver('zip', { zlib: { level: 9 } });
 
-  let fileCount = 0;
-  let excludedCount = 0;
+  const includedFiles = [];
 
   return new Promise((resolve, reject) => {
     output.on('close', () => {
-      validateZipContents(outputPath, fileCount);
-      console.log(`\n⚠️  Arquivos excluídos por segurança: ${excludedCount}`);
-      console.log(`\n✅ Submission ZIP pronto: ${outputPath}`);
+      console.log(`\n✅ ZIP criado com sucesso: ${outputPath}`);
+      console.log(`📊 Total de arquivos: ${includedFiles.length}`);
+      
+      // Validação Final de Segurança
+      console.log('🔍 Executando auditoria final de segurança...');
+      for (const file of includedFiles) {
+        if (isForbidden(file)) {
+          console.error(`\n❌ ERRO CRÍTICO: Arquivo proibido detectado no ZIP: ${file}`);
+          process.exit(1);
+        }
+      }
+      console.log('✓ Auditoria concluída: Nenhum segredo detectado.');
       resolve();
     });
 
     archive.on('error', (err) => {
-      console.error('❌ Erro ao criar ZIP:', err);
+      console.error('❌ Erro no Archiver:', err);
       reject(err);
+    });
+
+    // Avisar se algum arquivo entrar que não deveria (via stream)
+    archive.on('entry', (entry) => {
+      if (isForbidden(entry.name)) {
+        console.error(`\n❌ VIOLAÇÃO DE SEGURANÇA: Tentativa de incluir arquivo proibido: ${entry.name}`);
+        archive.abort();
+        reject(new Error(`Forbidden file entry: ${entry.name}`));
+      }
     });
 
     archive.pipe(output);
 
-    function addDirectory(dirPath, archivePath = '') {
+    function listTrackedFiles() {
       try {
-        const entries = readdirSync(dirPath, { withFileTypes: true });
-
-        for (const entry of entries) {
-          const fullPath = join(dirPath, entry.name);
-          const relPath = relative(projectRoot, fullPath).replace(/\\/g, '/');
-          const zipPath = archivePath ? join(archivePath, entry.name).replace(/\\/g, '/') : relPath;
-
-          if (shouldExclude(relPath)) {
-            excludedCount++;
-            continue;
-          }
-
-          if (entry.isDirectory()) {
-            addDirectory(fullPath, zipPath);
-          } else if (entry.isFile()) {
-            try {
-              const stat = statSync(fullPath);
-              archive.file(fullPath, { name: zipPath });
-              fileCount++;
-            } catch (err) {
-              console.warn(`⚠️  Pulando arquivo: ${relPath} (${err.message})`);
-            }
-          }
-        }
-      } catch (err) {
-        console.warn(`⚠️  Erro ao ler diretório ${dirPath}: ${err.message}`);
+        const out = execSync('git ls-files -z', {
+          cwd: projectRoot,
+          stdio: ['ignore', 'pipe', 'ignore'],
+        });
+        return out
+          .toString('utf8')
+          .split('\0')
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .map((p) => p.replace(/\\/g, '/'));
+      } catch {
+        return null;
       }
     }
 
-    addDirectory(projectRoot);
-    archive.finalize();
+    try {
+      const tracked = listTrackedFiles();
+      if (!tracked) {
+        throw new Error(
+          'Não foi possível listar arquivos versionados via git. Execute este script dentro de um repositório git.',
+        );
+      }
+
+      // Fail-fast: se algo proibido estiver versionado, não permite criar ZIP.
+      const forbiddenTracked = tracked.filter((p) => isForbidden(p));
+      if (forbiddenTracked.length > 0) {
+        const sample = forbiddenTracked.slice(0, 20).join('\n  - ');
+        throw new Error(
+          `Arquivos proibidos detectados no conjunto versionado (git). Remova-os do versionamento antes da submissão:\n  - ${sample}`,
+        );
+      }
+
+      // Inclui APENAS arquivos versionados (git), evitando vazamento de artefatos locais/untracked.
+      for (const relPath of tracked) {
+        const fullPath = join(projectRoot, relPath);
+        archive.file(fullPath, { name: relPath });
+        includedFiles.push(relPath);
+      }
+
+      archive.finalize();
+    } catch (err) {
+      reject(err);
+    }
   });
 }
 
 createSubmissionZip().catch((err) => {
-  console.error('Falha ao criar ZIP:', err);
+  console.error('\n💥 Falha catastrófica ao criar o ZIP:', err.message);
   process.exit(1);
 });

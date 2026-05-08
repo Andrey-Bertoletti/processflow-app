@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 import Button from "@/components/ui/Button";
 import Surface from "@/components/ui/Surface";
@@ -11,6 +12,7 @@ import useWorkspaceAdmin from "@/hooks/useWorkspaceAdmin";
 import { toast } from "sonner";
 
 export default function CampaignsPage() {
+  const router = useRouter();
   const { activeWorkspaceId } = useAuth();
   const { isAdmin } = useWorkspaceAdmin(activeWorkspaceId, Boolean(activeWorkspaceId));
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -82,7 +84,7 @@ export default function CampaignsPage() {
         <Surface className="p-12 text-center">
           <h3 className="text-lg font-semibold text-white">Selecione um workspace</h3>
           <p className="text-slate-400 mt-2">Escolha um workspace no dashboard para ver campanhas.</p>
-          <Button variant="secondary" className="mt-6" onClick={() => (window.location.href = "/auth/dashboard")}>
+          <Button variant="secondary" className="mt-6" onClick={() => router.push("/auth/dashboard")}>
             Ir para dashboard
           </Button>
         </Surface>

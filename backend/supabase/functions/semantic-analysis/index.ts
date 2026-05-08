@@ -13,174 +13,97 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
-function isUuid(value: unknown): value is string {
-  if (typeof value !== "string") return false;
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
+async function canAccessLeadWorkspace(
+  admin: ReturnType<typeof createClient>,
+  userId: string,
+  workspaceId: string,
+): Promise<boolean> {
+  const { data: ws } = await admin.from("workspaces").select("owner_id").eq("id", workspaceId).maybeSingle();
+  if (ws?.owner_id === userId) return true;
 
-function sanitizeForPrompt(input: unknown, max = 2000) {
-  if (input === null || input === undefined) return "";
-  return String(input).replace(/\s+/g, " ").trim().slice(0, max);
-}
+  const { data: row } = await admin
+    .from("workspace_users")
+    .select("user_id")
+    .eq("workspace_id", workspaceId)
+    .eq("user_id", userId)
+    .maybeSingle();
 
-async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs: number) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  return Boolean(row);
 }
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-  if (req.method !== "POST") return jsonResponse({ error: "Method Not Allowed" }, 405);
 
-  const projectUrl = Deno.env.get("PROJECT_URL") ?? "";
-  const serviceRoleKey = Deno.env.get("SERVICE_ROLE_KEY") ?? "";
-  if (!projectUrl || !serviceRoleKey) {
-    return jsonResponse({ error: "Server misconfigured: missing Supabase env vars (PROJECT_URL and SERVICE_ROLE_KEY)." }, 500);
-  }
-
-  const authHeader = req.headers.get("Authorization");
-  if (!authHeader) return jsonResponse({ error: "Unauthorized" }, 401);
-
-  const supabase = createClient(projectUrl, serviceRoleKey, {
-    global: { headers: { Authorization: authHeader } },
-    auth: { persistSession: false },
-  });
-
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) return jsonResponse({ error: "Unauthorized" }, 401);
-
-  let body: any;
   try {
-    body = await req.json();
-  } catch {
-    return jsonResponse({ error: "Invalid JSON body." }, 400);
-  }
+    const projectUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+    const authHeader = req.headers.get("Authorization");
 
-  const leadId = body?.lead_id ?? body?.leadId;
-  if (!isUuid(leadId)) return jsonResponse({ error: "lead_id is required (UUID)." }, 400);
+    const supabaseAdmin = createClient(projectUrl, serviceRoleKey, { auth: { persistSession: false } });
+    const token = authHeader?.replace("Bearer ", "") ?? "";
+    const {
+      data: { user },
+    } = await supabaseAdmin.auth.getUser(token);
 
-  // Hard authorization guard:
-  // Edge Functions may run with elevated keys; always enforce workspace membership explicitly.
-  const { data: lead, error: leadError } = await supabase
-    .from("leads")
-    .select("id, workspace_id")
-    .eq("id", leadId)
-    .maybeSingle();
+    if (!user) return jsonResponse({ error: "Auth required" }, 401);
 
-  if (leadError) {
-    console.error("[SEMANTIC_LEAD_LOAD_ERR]", leadError);
-    return jsonResponse({ error: "Failed to load lead." }, 500);
-  }
+    const body = await req.json().catch(() => ({}));
+    const leadId = body?.lead_id ?? body?.leadId;
 
-  if (!lead) {
-    return jsonResponse({ error: "Forbidden" }, 403);
-  }
-
-  const { data: membership, error: membershipError } = await supabase
-    .from("workspace_users")
-    .select("id")
-    .eq("workspace_id", (lead as any).workspace_id)
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (membershipError) {
-    console.error("[SEMANTIC_AUTHZ_ERR]", membershipError);
-    return jsonResponse({ error: "Failed to authorize request." }, 500);
-  }
-
-  if (!membership) {
-    return jsonResponse({ error: "Forbidden" }, 403);
-  }
-
-  const { data: activities, error: actError } = await supabase
-    .from("activities")
-    .select("*")
-    .eq("lead_id", leadId)
-    .order("event_sequence", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true })
-    .limit(80);
-
-  if (actError || !activities) return jsonResponse({ error: "Failed to fetch activities." }, 500);
-
-  const timelineText = activities
-    .map((act: any) => {
-      let desc = act.type;
-      if (act.type === "stage_change") desc += ` (${act.content?.old_stage_name} -> ${act.content?.new_stage_name})`;
-      if (act.type === "ai_message" || act.type === "manual_message") desc += `: "${sanitizeForPrompt(act.content?.content, 300)}"`;
-      const ts = act.created_at ? new Date(act.created_at).toISOString() : "";
-      return `[${ts}] ${desc}`;
-    })
-    .join("\n");
-
-  const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
-  const openaiModel = Deno.env.get("OPENAI_MODEL") ?? "gpt-4o-mini";
-  if (!openaiKey) return jsonResponse({ error: "AI not configured." }, 500);
-
-  const prompt = `Você é um AI Sales Assistant sênior analisando a linha do tempo de um lead em nosso CRM.
-Baseado exclusivamente nos eventos abaixo, forneça:
-1) Um resumo curto do momento atual do lead (1-2 frases).
-2) O humor/engajamento deduzido do lead (ex: Frio, Engajado, Ignorando, etc).
-3) A próxima melhor ação sugerida para o vendedor humano tomar.
-
-Eventos do Lead:
-${timelineText}
-
-Responda em JSON estrito (sem markdown) exatamente neste formato:
-{
-  "summary": "string",
-  "engagement_status": "string",
-  "suggested_action": "string"
-}`;
-
-  const timeoutMs = Number(Deno.env.get("AI_TIMEOUT_MS") ?? "10000");
-  let openaiJson: any;
-  try {
-    const res = await fetchWithTimeout(
-      "https://api.openai.com/v1/chat/completions",
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
-        body: JSON.stringify({
-          model: openaiModel,
-          response_format: { type: "json_object" },
-          messages: [{ role: "system", content: prompt }],
-          temperature: 0.3,
-          max_tokens: 350,
-        }),
-      },
-      Number.isFinite(timeoutMs) ? Math.max(1000, Math.min(60000, timeoutMs)) : 10000
-    );
-
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      return jsonResponse({ error: "OpenAI request failed.", detail: errText }, res.status === 429 ? 429 : 502);
+    if (!leadId || typeof leadId !== "string") {
+      return jsonResponse({ error: "lead_id required" }, 400);
     }
-    openaiJson = await res.json();
-  } catch (err: any) {
-    const isTimeout = err?.name === "AbortError";
-    return jsonResponse({ error: isTimeout ? "AI request timed out." : "AI request failed." }, isTimeout ? 504 : 502);
-  }
 
-  const content = openaiJson?.choices?.[0]?.message?.content ?? "{}";
-  let analysis: any = null;
-  try {
-    analysis = JSON.parse(content);
-  } catch {
-    analysis = null;
-  }
+    const { data: lead } = await supabaseAdmin.from("leads").select("*").eq("id", leadId).maybeSingle();
+    if (!lead) return jsonResponse({ error: "Lead not found" }, 404);
 
-  if (!analysis || typeof analysis.summary !== "string") {
-    return jsonResponse({ error: "AI returned an invalid payload." }, 502);
-  }
+    const allowed = await canAccessLeadWorkspace(supabaseAdmin, user.id, lead.workspace_id as string);
+    if (!allowed) {
+      return jsonResponse({ error: "Forbidden" }, 403);
+    }
 
-  return jsonResponse({ analysis }, 200);
+    const { data: activities } = await supabaseAdmin
+      .from("activities")
+      .select("id, type, content, created_at, created_by")
+      .eq("lead_id", leadId)
+      .order("created_at", { ascending: false })
+      .limit(30);
+
+    const apiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
+    const model = Deno.env.get("OPENAI_MODEL") ?? "llama-3.3-70b-versatile";
+
+    let baseUrl = "https://api.openai.com/v1/chat/completions";
+    if (apiKey.startsWith("gsk_")) baseUrl = "https://api.groq.com/openai/v1/chat/completions";
+
+    const systemPrompt = `Você é um Analista de Inteligência de Vendas.
+    Analise o histórico de interações do lead ${lead.name} (${lead.company}) e gere um resumo estratégico.
+    
+    Histórico: ${JSON.stringify(activities)}
+    
+    Retorne APENAS um JSON:
+    {
+      "summary": "Resumo executivo de 2 frases sobre o momento do lead.",
+      "engagement_status": "Alta / Média / Baixa",
+      "sentiment": "Positivo / Neutro / Negativo",
+      "suggested_action": "O que o vendedor deve fazer agora (ex: Ligar, Mandar Zap, Esperar)."
+    }`;
+
+    const res = await fetch(baseUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model: model,
+        messages: [{ role: "system", content: systemPrompt }],
+        temperature: 0.1,
+      }),
+    });
+
+    const json = await res.json();
+    const content = json.choices?.[0]?.message?.content || "";
+    const match = content.match(/\{[\s\S]*\}/);
+
+    return jsonResponse({ analysis: JSON.parse(match ? match[0] : content) });
+  } catch (error: any) {
+    return jsonResponse({ error: error.message }, 500);
+  }
 });
-

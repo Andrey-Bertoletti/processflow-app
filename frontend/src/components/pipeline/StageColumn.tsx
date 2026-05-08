@@ -84,8 +84,9 @@ export default function StageColumn({
         )}
 
         {stage.leads.length === 0 && !isDragOver ? (
-          <div className="rounded-xl px-3 py-10 text-center text-xs text-zinc-600">
-            Sem leads nesta etapa
+          <div className="flex flex-col items-center justify-center py-12 px-4 rounded-xl border border-dashed border-white/5 bg-white/[0.01]">
+            <span className="text-xl mb-2 opacity-20">🧊</span>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-zinc-700">Vazio</p>
           </div>
         ) : (
           stage.leads.map((lead: Lead) => (
