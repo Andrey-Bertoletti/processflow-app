@@ -1,191 +1,396 @@
-# ProcessFlow - SDR Intelligence & CRM 🚀
+# ProcessFlow App
 
-> Mini CRM voltado para equipes de Pré-Vendas (SDR) com funcionalidades de geração de mensagens personalizadas utilizando Inteligência Artificial.
+Mini CRM para equipes de SDR com Kanban por workspace, campanhas, campos personalizados, automações de funil e geração de mensagens com IA.
 
-**ProcessFlow** é uma plataforma de gestão de leads desenvolvida como prova técnica para demonstrar competências em engenharia de software full stack, integração com Inteligência Artificial e arquitetura de sistemas escaláveis e seguros, utilizando ferramentas modernas de *Vibe Coding*.
-
-O sistema permite que equipes organizem leads em um funil visual Kanban, criem campanhas de abordagem com contextos específicos (ex: Black Friday) e gerem mensagens personalizadas usando IA — considerando os dados padrão e campos customizados de cada lead.
-
----
-
-## 📺 Demonstração & Links
-
-- **Aplicação:** https://processflow-app-eosin.vercel.app
-- **Root Directory na Vercel:** `frontend`
-- **Vídeo de Walkthrough:** Pendente — adicionar o link (YouTube/Drive) antes da submissão final.
-
-## 📎 Edital (Prova)
-
-- O edital original está versionado na raiz: `Prova Técnica — Desenvolvedor Vibe Coding Full Stack-20260505132034.md`
+![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat-square&logo=next.js)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%2B%20Auth%20%2B%20Edge%20Functions-3FCF8E?style=flat-square&logo=supabase&logoColor=111)
+![Tailwind CSS](https://img.shields.io/badge/TailwindCSS-UI-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![OpenAI](https://img.shields.io/badge/OpenAI-API-412991?style=flat-square&logo=openai&logoColor=white)
+![Status](https://img.shields.io/badge/status-pronto%20para%20avalia%C3%A7%C3%A3o-22c55e?style=flat-square)
 
 ---
 
-## 🛠️ Tecnologias Utilizadas
+## Links
 
-| Camada | Tecnologia / Ferramenta |
-|--------|-------------------------|
-| **Frontend** | Next.js 14 (App Router) + React 18 + TypeScript |
-| **Estilização** | Tailwind CSS + Design System customizado (CSS Variables) |
-| **Componentes** | Shadcn/UI (base com customizações avançadas), Recharts, Lucide React, Sonner |
-| **Estado/Dados** | React Context API & React Server Components |
-| **Backend** | Supabase Edge Functions (Deno 2 / TypeScript) |
-| **Banco de Dados** | Supabase (PostgreSQL 17 gerenciado) |
-| **Autenticação** | Supabase Auth (Email, Password, JWT & Session) |
-| **Integração IA** | OpenAI API (GPT-4o-mini) via Edge Functions |
-| **Hospedagem** | Vercel (Frontend) + Supabase Cloud (Backend) |
+| Recurso | Link |
+|---|---|
+| Deploy | [processflow-app-eosin.vercel.app](https://processflow-app-eosin.vercel.app) |
+| Vídeo | Pendente — será adicionado antes da entrega final |
+| Auditoria | [`AUDITORIA_EDITAL.md`](./AUDITORIA_EDITAL.md) |
+| Testes manuais | [`docs/TESTE_MANUAL.md`](./docs/TESTE_MANUAL.md) |
+| Edital | `Prova Técnica — Desenvolvedor Vibe Coding Full Stack-20260505132034.md` |
 
 ---
 
-## 🏗️ Arquitetura & Decisões Técnicas
+## Sobre o projeto
 
-O projeto adota uma arquitetura descentralizada para garantir performance e segurança:
+O **ProcessFlow App** é um Mini CRM voltado para times de pré-vendas.  
+A aplicação permite organizar leads em um funil Kanban, criar campanhas de abordagem, configurar campos personalizados por workspace e gerar mensagens personalizadas com IA.
 
-1. **Frontend (Next.js):** Camada de apresentação reativa, otimizada para SEO e interações de baixa latência no Kanban.
-2. **Backend Serverless (Edge Functions):** Lógicas pesadas e integrações com APIs externas (OpenAI) ocorrem em funções de borda, reduzindo o tempo de resposta global.
-3. **Database Layer (Postgres):** O banco atua como guardião da integridade via Triggers, RPCs e RLS.
+O sistema foi desenvolvido com foco em:
 
-### Multi-tenancy & Segurança
-O isolamento entre empresas (Workspaces) é garantido nativamente no banco de dados.
-- Cada tabela possui uma coluna `workspace_id`.
-- Usuários só podem acessar dados onde possuem um vínculo na tabela `workspace_users`.
-- Cada usuário cria seu workspace e é adicionado como `admin`. O sistema adota um modelo de permissões binário: `admin` (gestão total) e `member` (operação).
-- **Desafio Resolvido (Recursão em RLS):** Policies que faziam `SELECT` em `workspace_users` causavam loop infinito. A solução foi criar funções `SECURITY DEFINER` (`can_access_workspace()`) que bypassam o RLS internamente para validação segura. Isso impede ataques IDOR.
-
-### Modelagem de Campos Customizados (EAV Relacional)
-Em vez de usar colunas `JSONB` fixas, o sistema utiliza um modelo relacional flexível:
-- `workspace_custom_fields`: Define o esquema de dados do cliente (text, number, select).
-- `lead_custom_field_values`: Armazena os valores (relação N:N), garantindo flexibilidade sem alterar o schema base e permitindo validações por etapa do funil.
-
-### Integração com LLM (OpenAI)
-- A Edge Function `generate-message` recebe `lead_id` e `campaign_id`, carrega os dados (incluindo custom fields via join) e monta um prompt estruturado.
-- **Segurança:** Respostas em JSON estrito com sanitização e proteção contra injeção de prompt.
-- **Cache Inteligente:** Utiliza `prompt_hash` (SHA-256). Se os dados do lead e campanha não mudaram, retorna a geração anterior, poupando tokens. Possui suporte a retry com timeout e rate limiting.
-- As mensagens geradas são persistidas na tabela `messages` com metadados (modelo, latência, estilo).
+- isolamento de dados por workspace;
+- geração de mensagens com IA via backend seguro;
+- regras de qualidade de dados por etapa;
+- automações por etapa gatilho;
+- interface administrativa com papéis `admin` e `member`;
+- segurança com Supabase Auth, PostgreSQL e RLS.
 
 ---
 
-## 🎯 Funcionalidades Implementadas (Checklist)
+## Funcionalidades
 
-### ✅ Requisitos Obrigatórios
-- [x] **Cadastro e Login:** Gestão de usuários com Supabase Auth.
-- [x] **Gestão de Leads (CRUD):** Criação, edição, exclusão, visualização detalhada e atribuição de responsável.
-- [x] **Funil Kanban:** Pipeline com drag-and-drop e 7 etapas padronizadas:
-    1. Base | 2. Lead Mapeado | 3. Tentando Contato | 4. Conexão Iniciada | 5. Desqualificado | 6. Qualificado | 7. Reunião Agendada.
-- [x] **Gestão de Campanhas:** Definição de nome, contexto e prompt base.
-- [x] **Geração de Mensagens IA:** Criação de 3 variações (Direta, Consultiva, Criativa).
-- [x] **Ação de Envio Simulada:** Transação que marca a mensagem como enviada, move o lead para "Tentando Contato" e registra no histórico.
-- [x] **Isolamento de Workspaces (RLS):** Criação de workspace com seed automático e isolamento total.
-- [x] **Campos Customizados:** Suporte configurável por workspace.
-- [x] **Dashboard:** Métricas gerais (leads por etapa, totais).
+### CRM e funil
 
-### ✨ Diferenciais (Hardening & UX)
-- [x] **Regras de Transição:** O `required_fields` na tabela `stages` bloqueia a movimentação no Kanban caso faltem dados obrigatórios (padrão ou customizados) na etapa destino.
-- [x] **Timeline de Eventos:** Registro histórico detalhado das interações com o lead.
-- [x] **Automação de Gatilho:** Implementação de `auto_campaign_id` via trigger/webhook que dispara a Edge Function gerando IA automaticamente ao entrar no estágio.
-- [x] **Multi-workspace:** Usuário pode participar/alternar entre vários workspaces.
-- [x] **Cache IA:** Sistema de hash para evitar requisições redundantes.
+- Cadastro e edição de leads.
+- Campos padrão: nome, email, telefone, empresa, cargo, origem e observações.
+- Responsável opcional pelo lead.
+- Kanban por etapa do funil.
+- Histórico de atividades.
+- Histórico de mensagens geradas e enviadas.
+
+### Funil padrão
+
+1. Base
+2. Lead Mapeado
+3. Tentando Contato
+4. Conexão Iniciada
+5. Desqualificado
+6. Qualificado
+7. Reunião Agendada
+
+### Campanhas e IA
+
+- Criação de campanhas com nome, contexto e prompt.
+- Geração de 2 a 3 variações de mensagens.
+- Regeneração sob demanda.
+- Cópia da mensagem gerada.
+- Envio simulado.
+- Movimentação automática para **Tentando Contato** após envio.
+
+### Campos personalizados
+
+- Criação de campos por workspace.
+- Valores personalizados por lead.
+- Uso dos campos personalizados no prompt da IA.
+- Suporte a campos obrigatórios por etapa.
+
+### Automação por etapa gatilho
+
+- Campanha vinculada a uma etapa do funil.
+- Geração automática quando o lead entra na etapa configurada.
+- Processamento assíncrono via fila e Edge Functions.
+- Mensagens persistidas no lead para visualização posterior.
+
+### Administração
+
+- Papéis simples: `admin` e `member`.
+- `admin` gerencia funil, campos, campanhas e membros.
+- `member` opera leads, Kanban e mensagens.
+- Proteção por RLS e validações no backend.
 
 ---
 
-## 🔒 Painel Administrativo (Workspace)
+## Checklist do edital
 
-- **URL (local):** `http://localhost:3000/admin`
-- **Quem acessa:** Usuários com papel `admin` no workspace selecionado.
-- **Regras de Atribuição:** 
-    - O primeiro usuário de um workspace vira `admin` automaticamente.
-    - Usuários adicionados ou convidados posteriormente vira `member` por padrão.
+### Obrigatórios
+
+- [x] Cadastro e login
+- [x] Workspaces
+- [x] Isolamento por workspace
+- [x] Leads com campos padrão
+- [x] Campos personalizados
+- [x] Responsável pelo lead
+- [x] Kanban
+- [x] Funil de pré-vendas
+- [x] Movimentação de leads
+- [x] Detalhe e edição do lead
+- [x] Campanhas com nome, contexto e prompt
+- [x] Geração de mensagens com IA
+- [x] 2 a 3 variações
+- [x] Regeneração
+- [x] Copiar mensagem
+- [x] Envio simulado
+- [x] Movimento automático para **Tentando Contato**
+- [x] Regras de transição
+- [x] Dashboard
+- [x] Deploy público
+- [ ] Vídeo obrigatório — pendente até a entrega final
+
+### Diferenciais
+
+- [x] Geração automática por etapa gatilho
+- [x] Edição/configuração do funil
+- [x] Multi-workspace
+- [x] Gestão de membros `admin` / `member`
+- [x] Histórico de atividades
+- [x] Histórico de mensagens
+- [x] Filtros e busca
+- [x] Métricas avançadas
+- [x] Row Level Security
+- [x] ZIP seguro de submissão
 
 ---
 
-## 🚀 Como Rodar Localmente
+## Stack
 
-### Pré-requisitos
-- Node.js 18+
-- Supabase CLI (opcional para rodar local completo)
-- Conta no OpenAI (API Key)
+| Camada | Tecnologias |
+|---|---|
+| Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS |
+| Backend | Supabase Edge Functions, TypeScript, Deno |
+| Banco | Supabase PostgreSQL, RLS, migrations, triggers, RPCs |
+| Auth | Supabase Auth |
+| IA | OpenAI API |
+| Deploy | Vercel + Supabase |
+| DevOps | Supabase CLI, scripts de sync e ZIP seguro |
 
-### 1) Clonar o Repositório
-```bash
-git clone https://github.com/Andrey-Bertoletti/processflow-app.git
-cd processflow-app
+---
+
+## Estrutura do projeto
+
+```text
+/
+├── frontend/
+│   ├── src/
+│   │   ├── app/
+│   │   ├── components/
+│   │   ├── hooks/
+│   │   ├── lib/
+│   │   └── types/
+│   ├── public/
+│   └── package.json
+│
+├── backend/
+│   └── supabase/
+│       ├── functions/
+│       │   ├── generate-message/
+│       │   ├── ai-worker/
+│       │   ├── projection-worker/
+│       │   └── ai-insights-engine/
+│       └── config.toml
+│
+├── database/
+│   ├── migrations/
+│   ├── seed.sql
+│   └── README.md
+│
+├── docs/
+│   └── TESTE_MANUAL.md
+│
+├── scripts/
+│   └── create-submission-zip.mjs
+│
+├── AUDITORIA_EDITAL.md
+├── contexto.md
+├── README.md
+├── package.json
+└── .env.example
+````
+
+| Pasta                         | Finalidade                                                      |
+| ----------------------------- | --------------------------------------------------------------- |
+| `frontend/`                   | Aplicação Next.js, rotas, componentes e integração com Supabase |
+| `backend/supabase/functions/` | Edge Functions, geração de IA, workers e lógica sensível        |
+| `database/migrations/`        | Schema, RLS, RPCs, triggers e policies                          |
+| `docs/`                       | Testes manuais, roteiro do vídeo e documentação de apoio        |
+| `scripts/`                    | Automação de ZIP seguro e rotinas auxiliares                    |
+
+---
+
+## Decisões técnicas
+
+### Supabase como backend
+
+O Supabase foi usado por reunir autenticação, PostgreSQL, RLS e Edge Functions em uma única plataforma, atendendo diretamente aos requisitos técnicos do desafio.
+
+### Multi-tenancy por workspace
+
+Os dados principais possuem `workspace_id`.
+O vínculo do usuário com o workspace é controlado pela tabela `workspace_users`.
+
+### Segurança com RLS
+
+O isolamento entre workspaces é feito no banco.
+Mesmo que alguém tente manipular IDs pelo frontend, as policies impedem acesso fora do workspace autorizado.
+
+### Papéis simples
+
+O sistema usa apenas dois papéis:
+
+* `admin`: gerencia configurações, funil, campos, campanhas e membros;
+* `member`: opera leads, Kanban, mensagens e dashboard básico.
+
+### IA no backend
+
+A OpenAI é chamada apenas pelas Supabase Edge Functions.
+O frontend nunca recebe `OPENAI_API_KEY` ou `SERVICE_ROLE_KEY`.
+
+### Envio simulado
+
+Ao enviar uma mensagem, o sistema marca a mensagem como enviada, move o lead para **Tentando Contato** e registra o evento no histórico.
+
+---
+
+## Variáveis de ambiente
+
+### Frontend / Vercel
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
 ```
 
-### 2) Instalar Dependências
+### Supabase Edge Functions
+
+```env
+PROJECT_URL=
+SERVICE_ROLE_KEY=
+OPENAI_API_KEY=
+WEBHOOK_SECRET=
+```
+
+> `SERVICE_ROLE_KEY` e `OPENAI_API_KEY` devem ficar apenas no backend/Edge Functions.
+
+---
+
+## Como rodar localmente
+
+### Pré-requisitos
+
+* Node.js 18+
+* Docker
+* Supabase CLI
+* Conta OpenAI para geração real de mensagens
+
+### Instalação
+
 ```bash
-# dependências do frontend
+npm install
+
 cd frontend
 npm install
 cd ..
 ```
 
-### 3) Configuração de Ambiente (sem secrets no Git)
+### Ambiente do frontend
 
-**Frontend (Vercel / Next.js):**
-- Copie `frontend/.env.example` → `frontend/.env.local`
-- Configure apenas as variáveis públicas (seguras para o browser):
+Crie `frontend/.env.local`:
+
 ```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+NEXT_PUBLIC_SUPABASE_URL=https://seu-projeto.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sua-anon-key
 ```
 
-**Edge Functions (Supabase):**
-- As variáveis de backend devem ser configuradas via Supabase CLI (`supabase secrets set`) ou no Painel do Supabase:
-- **Server-only (Secrets):**
-  - `PROJECT_URL`: URL base do projeto Supabase.
-  - `SERVICE_ROLE_KEY`: Chave de serviço para operações administrativas.
-  - `OPENAI_API_KEY`: Chave da API para inteligência artificial.
-  - `WEBHOOK_SECRET`: Segredo de validação para gatilhos (se configurado).
+### Rodar localmente
 
-> [!IMPORTANT]
-> `OPENAI_API_KEY` e `SERVICE_ROLE_KEY` são segredos críticos. **Nunca** os inclua no frontend ou em variáveis prefixadas com `NEXT_PUBLIC_`.
-
-### 4) Banco de Dados & Supabase Local
 ```bash
-# inicia o stack local (Docker) + aplica migrations
 npm run supabase:start
-```
-
-### 5) Rodar Edge Functions e Frontend
-```bash
-# Edge Functions
 npm run back
-
-# Frontend
 npm run front
 ```
 
 ---
 
-## 📁 Estrutura do Projeto
+## Deploy
 
-```text
-processflow-app/
-├── frontend/                 # Next.js 14 App
-│   ├── src/app/              # Rotas e páginas
-│   ├── src/components/       # Componentes React
-│   ├── src/lib/              # Utilitários e clients
-│   └── src/types/            # TypeScript types
-├── backend/                  # Backend (Supabase CLI + Edge Functions)
-│   └── supabase/
-│       ├── functions/        # Edge Functions (IA, workers)
-│       └── migrations/       # mirror gerado via sync (não editar direto)
-├── database/                 # Banco (fonte da verdade)
-│   ├── migrations/           # migrations SQL (source of truth)
-│   ├── seed.sql              # seed opcional
-│   └── schema.sql            # snapshot opcional
-└── contexto.md               # Contexto técnico para continuidade
+### Vercel
+
+| Configuração   | Valor                                                       |
+| -------------- | ----------------------------------------------------------- |
+| Root Directory | `frontend`                                                  |
+| Build Command  | `npm run build`                                             |
+| Output         | `.next`                                                     |
+| Variáveis      | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` |
+
+### Supabase Edge Functions
+
+```bash
+cd backend/supabase
+
+supabase functions deploy generate-message
+supabase functions deploy ai-worker
+```
+
+Secrets:
+
+```bash
+supabase secrets set PROJECT_URL="https://seu-projeto.supabase.co"
+supabase secrets set SERVICE_ROLE_KEY="sua-service-role-key"
+supabase secrets set OPENAI_API_KEY="sua-openai-key"
 ```
 
 ---
 
-## 🔐 Segurança & Build de Produção
+## Testes e validação
 
-- **Secrets:** Nunca comite arquivos `.env` reais. Use o Painel da Vercel para gerenciar variáveis de produção de forma segura.
-- **Rotação:** Se alguma chave já foi exposta/commitada em algum momento, faça rotação imediata no Supabase e no provedor da LLM (OpenAI).
+### Build
+
+```bash
+cd frontend
+npm run build
+```
+
+### Testes
+
+```bash
+cd frontend
+npm run test
+```
+
+### ZIP seguro
+
+```bash
+npm run zip:submission
+```
+
+O ZIP final não deve conter:
+
+* `.env`;
+* `.env.local`;
+* `.git`;
+* `.vercel`;
+* `node_modules`;
+* `.next`;
+* logs;
+* arquivos temporários.
 
 ---
 
-## 👤 Autor
+## Segurança
 
-Desenvolvido por **Andrey Bertoletti**.  
-Especialista em soluções escaláveis com foco em experiência do usuário e IA.
+O projeto utiliza:
+
+* Supabase Auth;
+* Row Level Security;
+* isolamento por workspace;
+* roles `admin` e `member`;
+* RPCs com validação por `auth.uid()`;
+* Edge Functions com validação de sessão e workspace;
+* secrets fora do frontend;
+* ZIP seguro sem arquivos sensíveis.
+
+---
+
+## Roteiro sugerido para o vídeo
+
+1. Cadastro e login.
+2. Criação ou seleção de workspace.
+3. Criação de lead.
+4. Criação de campanha.
+5. Geração de 3 mensagens com IA.
+6. Regeneração de mensagens.
+7. Cópia da mensagem.
+8. Envio simulado.
+9. Lead movido para **Tentando Contato**.
+10. Histórico do lead.
+11. Dashboard.
+12. Explicação rápida da arquitetura e diferenciais.
+
+---
+
+## Status
+
+Projeto tecnicamente pronto para avaliação de código e conformidade com o edital.
+
+O vídeo obrigatório permanece pendente e será adicionado antes da entrega final.
